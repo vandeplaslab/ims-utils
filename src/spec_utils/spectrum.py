@@ -1,11 +1,12 @@
 """Spectra."""
+import math
 import typing as ty
 from contextlib import suppress
 
 import numba
 import numpy as np
 from scipy.interpolate import interp1d
-from scipy.signal import find_peaks
+from scipy.signal import decimate, find_peaks, resample, resample_poly, upfirdn
 
 
 def has_pyopenms() -> bool:
@@ -17,7 +18,15 @@ def has_pyopenms() -> bool:
     return True
 
 
-def oms_centroid(mzs: np.ndarray, intensities: np.ndarray, snr: float = 0) -> ty.Tuple[np.ndarray, np.ndarray]:
+def oms_centroid(
+    mzs: np.ndarray,
+    intensities: np.ndarray,
+    snr: float = 0,
+    spacing_difference: float = 1.5,
+    spacing_difference_gap: float = 4.0,
+    snr_auto_mode: int = 0,
+    **_kwargs,
+) -> ty.Tuple[np.ndarray, np.ndarray]:
     """PyOpenMS based centroiding."""
     import pyopenms as oms  # type: ignore
 
@@ -26,7 +35,15 @@ def oms_centroid(mzs: np.ndarray, intensities: np.ndarray, snr: float = 0) -> ty
 
     p = oms.PeakPickerHiRes()
     param = p.getDefaults()
-    param.update({b"signal_to_noise": float(snr)})
+    param.update(
+        {
+            b"signal_to_noise": float(snr),
+            b"spacing_difference": float(spacing_difference),
+            b"spacing_difference_gap": float(spacing_difference_gap),
+            b"SignalToNoise:auto_mode": int(snr_auto_mode),
+            b"SignalToNoise:write_log_messages": b"false",
+        }
+    )
     p.setParameters(param)
     p.pick(s, c)
     cx, cy = c.get_peaks()
@@ -160,3 +177,37 @@ def interpolate_ppm(new_mz: np.ndarray, mz_array: np.ndarray, intensity_array: n
     """Resample array at specified ppm."""
     func = interp1d(mz_array, intensity_array, fill_value=0, bounds_error=False)
     return new_mz, func(new_mz)
+
+
+def downsample(array_signal, n_up=2, n_down=20, ds_filter="upfirdn"):
+    """Downsample signal using one of multiple methods.
+
+    Parameters
+    ----------
+    array_signal : np.array, shape=(n_dt)
+        array to be downsampled
+    n_up : int
+        upsampling rate
+    n_down : int
+        downsampling rate
+    ds_filter : {'fir', 'upfirdn', 'decimate', 'poly', 'polynomial', 'fft'}
+        downsampling filter
+
+    Returns
+    -------
+    downsampled_signal : np.array
+        downsampled signal
+    """
+    ratio = n_down / n_up
+    out_size = math.ceil(array_signal.shape[0] / ratio)
+    if ds_filter in ["fir", "upfirdn"]:
+        downsampled_signal = upfirdn([1], array_signal, n_up, n_down)
+    elif ds_filter == "decimate":
+        downsampled_signal = decimate(array_signal, math.floor(ratio), ftype="fir")
+    elif ds_filter in ["poly", "polynomial"]:
+        downsampled_signal = resample_poly(array_signal, n_up, n_down)
+    elif ds_filter == "fft":
+        downsampled_signal = resample(array_signal, out_size)
+    else:
+        downsampled_signal = array_signal
+    return downsampled_signal

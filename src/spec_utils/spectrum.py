@@ -18,6 +18,21 @@ def has_pyopenms() -> bool:
     return True
 
 
+def centwave_estimate_baseline_and_noise(y: np.ndarray):
+    """Calculate signal-to-noise ratio."""
+    q_min, q_max = np.quantile(y, (0.05, 0.95))
+    indices = np.where((y > q_min) & (y < q_max))
+    yt = y[indices]
+    bl, nl = np.mean(yt), np.std(yt)
+    return bl, nl
+
+
+def centwave_estimate_noise(y: np.ndarray, ys: np.ndarray):
+    """Calculate signal-to-noise ratio."""
+    bl, nl = centwave_estimate_baseline_and_noise(y)
+    return (ys - bl) / nl
+
+
 def oms_centroid(
     mzs: np.ndarray,
     intensities: np.ndarray,

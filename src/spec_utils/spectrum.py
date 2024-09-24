@@ -30,7 +30,7 @@ def centwave_estimate_baseline_and_noise(y: np.ndarray):
     return bl, nl
 
 
-def centwave_estimate_noise(y: np.ndarray, ys: np.ndarray):
+def centwave_estimate_noise(y: np.ndarray, ys: np.ndarray) -> np.ndarray:
     """Calculate signal-to-noise ratio."""
     bl, nl = centwave_estimate_baseline_and_noise(y)
     return (ys - bl) / nl

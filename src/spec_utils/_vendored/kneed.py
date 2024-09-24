@@ -42,6 +42,7 @@ with permission by the Yellowbrick contributors.
 
 import warnings
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate
 from scipy.signal import argrelextrema
@@ -255,28 +256,27 @@ class KneeLocator:
 
         return knee, norm_knee
 
-    def plot_knee_normalized(self) -> None:
+    def plot_knee_normalized(self) -> plt.Figure:
         """
         Plots the normalized curve, the distance curve (x_distance, y_normalized) and the
         knee, if it exists.
         """
-        import matplotlib.pyplot as plt
 
-        plt.figure(figsize=(8, 8))
+        fig, ax = plt.subplots(figsize=(8, 8))
         plt.plot(self.x_normalized, self.y_normalized)
         plt.plot(self.x_difference, self.y_difference, "r")
         plt.xticks(np.arange(self.x_normalized.min(), self.x_normalized.max() + 0.1, 0.1))
         plt.yticks(np.arange(self.y_difference.min(), self.y_normalized.max() + 0.1, 0.1))
-
         plt.vlines(self.norm_knee, plt.ylim()[0], plt.ylim()[1])
+        return fig
 
-    def plot_knee(self) -> None:
+    def plot_knee(self) -> plt.Figure:
         """Plot the curve and the knee, if it exists."""
-        import matplotlib.pyplot as plt
 
-        plt.figure(figsize=(8, 8))
-        plt.plot(self.x, self.y)
-        plt.vlines(self.knee, plt.ylim()[0], plt.ylim()[1])
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.plot(self.x, self.y)
+        ax.vlines(self.knee, plt.ylim()[0], plt.ylim()[1])
+        return fig
 
     # Niceties for users working with elbows rather than knees
     @property

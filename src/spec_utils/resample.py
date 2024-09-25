@@ -17,29 +17,44 @@ class Object(ty.Protocol):
     mz_range: tuple[float, float]
 
 
-def get_spacing(readers: ty.Iterable[Object]) -> float:
-    """Get minimum spacing between spectra."""
-    min_values = np.array([np.min(ppm_diff(reader.mz_x)) for reader in readers])
+def _get_spacing(mz_xs: ty.Iterable[np.ndarray]) -> float:
+    """Get spacing from spectra."""
+    min_values = np.array([np.min(ppm_diff(mz_x)) for mz_x in mz_xs])
     ppm_spacing = np.min(min_values[min_values > 0]) or min_values.mean() or 1.0
     return ppm_spacing
 
 
+def get_spacing(readers: ty.Iterable[Object]) -> float:
+    """Get minimum spacing between spectra."""
+    mz_xs = [reader.mz_x for reader in readers]
+    return _get_spacing(mz_xs)
+
+
+def _get_mass_range(mz_xs: ty.Iterable[np.ndarray]) -> tuple[float, float]:
+    """Get minimum spacing between spectra."""
+    mz_ranges = [(np.min(mz_x), np.max(mz_x)) for mz_x in mz_xs]
+    return np.min(mz_ranges), np.max(mz_ranges)
+
+
 def get_mass_range(readers: ty.Iterable[Object]) -> tuple[float, float]:
     """Get minimum spacing between spectra."""
-    mz_ranges = [
-        reader.mz_range if hasattr(readers, "mz_range") else (np.min(reader.mz_x), np.max(reader.mz_x))
-        for reader in readers
-    ]
-    return np.min(mz_ranges), np.max(mz_ranges)
+    mz_xs = [reader.mz_x for reader in readers]
+    return _get_mass_range(mz_xs)
+
+
+def get_resampler_from_mzs(mz_xs: ty.Iterable[np.ndarray]) -> PpmResampling:
+    """Get resampler."""
+    # we need to convert to list so can be indexed, and we need to be able to iterate twice
+    ppm_spacing = _get_spacing(mz_xs)
+    mz_min, mz_max = _get_mass_range(mz_xs)
+    return PpmResampling(ppm_spacing, mz_min, mz_max)
 
 
 def get_resampler(readers: ty.Iterable[Object]) -> PpmResampling:
     """Get resampler."""
     # we need to convert to list so can be indexed, and we need to be able to iterate twice
-    readers = list(readers)  # type: ignore
-    ppm_spacing = get_spacing(readers)
-    mz_min, mz_max = get_mass_range(readers)
-    return PpmResampling(ppm_spacing, mz_min, mz_max)
+    mz_xs = [reader.mz_x for reader in readers]
+    return get_resampler_from_mzs(mz_xs)
 
 
 def resample_spectra(readers: ty.Iterable[Object], spectra: list[np.ndarray]) -> list[np.ndarray]:

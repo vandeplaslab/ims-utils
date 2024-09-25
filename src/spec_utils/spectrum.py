@@ -21,7 +21,7 @@ def has_pyopenms() -> bool:
     return True
 
 
-def centwave_estimate_baseline_and_noise(y: np.ndarray):
+def centwave_estimate_baseline_and_noise(y: np.ndarray) -> tuple[float, float]:
     """Calculate signal-to-noise ratio."""
     q_min, q_max = np.quantile(y, (0.05, 0.95))
     indices = np.where((y > q_min) & (y < q_max))
@@ -44,7 +44,7 @@ def oms_centroid(
     spacing_difference_gap: float = 4.0,
     snr_auto_mode: int = 0,
     **_kwargs,
-) -> ty.Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """PyOpenMS based centroiding."""
     import pyopenms as oms  # type: ignore
 
@@ -70,7 +70,7 @@ def oms_centroid(
 
 def picked_centroid(
     mz_array: np.ndarray, int_array: np.ndarray, threshold: float = 0.0
-) -> ty.Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Convert profile mass spectrum to centroids."""
     snr = 0 if threshold == 0 else np.max(int_array) * threshold
     return oms_centroid(mz_array, int_array, snr)
@@ -78,7 +78,7 @@ def picked_centroid(
 
 def maxima_centroid(
     mz_array: np.ndarray, int_array: np.ndarray, weighted_bins: int = 1, min_intensity: float = 1e-5
-) -> ty.Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Convert profile mass spectrum to centroids."""
     assert len(mz_array) == len(int_array), "Make sure x- and y-axis are of the same size"
     assert weighted_bins < len(mz_array) / 2.0
@@ -118,7 +118,7 @@ def maxima_centroid(
 
 def parabolic_centroid(
     mzs: np.ndarray, intensities: np.ndarray, peak_threshold: float = 0
-) -> ty.Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Calculate centroid position.
 
     This function was taken from msiwarp package available on GitHub
@@ -303,7 +303,7 @@ def apply_most_intense(xs, ys, index_groups, *arrays):
     return [np.array(r) for r in ret]
 
 
-def merge_peaks(xs: ty.List[np.ndarray], ys: ty.List[np.ndarray], threshold: float = 0.005):
+def merge_peaks(xs: list[np.ndarray], ys: list[np.ndarray], threshold: float = 0.005):
     """Merge peaks."""
     xs, indices = np.unique(np.concatenate(xs), return_index=True)
     ys = np.concatenate(ys)[indices]
@@ -312,7 +312,7 @@ def merge_peaks(xs: ty.List[np.ndarray], ys: ty.List[np.ndarray], threshold: flo
     return xs_new, ys_new
 
 
-def group_peaks_by_tol(xs: np.ndarray, threshold: float = 0.01) -> ty.Tuple[ty.List[np.ndarray], ty.List[np.ndarray]]:
+def group_peaks_by_tol(xs: np.ndarray, threshold: float = 0.01) -> tuple[list[np.ndarray], list[np.ndarray]]:
     """
     Group peaks together by their distance based on a threshold.
 

@@ -26,7 +26,10 @@ def get_spacing(readers: ty.Iterable[Object]) -> float:
 
 def get_mass_range(readers: ty.Iterable[Object]) -> tuple[float, float]:
     """Get minimum spacing between spectra."""
-    mz_ranges = [reader.mz_range for reader in readers]
+    mz_ranges = [
+        reader.mz_range if hasattr(readers, "mz_range") else (np.min(reader.mz_x), np.max(reader.mz_x))
+        for reader in readers
+    ]
     return np.min(mz_ranges), np.max(mz_ranges)
 
 

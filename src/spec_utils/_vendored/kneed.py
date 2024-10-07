@@ -181,9 +181,7 @@ class KneeLocator:
 
         return y
 
-    def find_knee(
-        self,
-    ):
+    def find_knee(self):
         """This function finds and sets the knee value and the normalized knee value."""
         if not self.maxima_indices.size:
             warning_message = (

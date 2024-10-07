@@ -19,6 +19,10 @@ def get_best_snr(data: list[tuple[int, float, int]]) -> tuple[int, float, int]:
 
     # convert data to numpy array
     res = np.asarray(data)
+    # check if there is a plateau at the end and if so, let's remove the last plateau
+    max_value = res[:, 2].max()
+    while res[-1, 2] == max_value:
+        res = res[:-1]
 
     # using knee locator to find the best SNR
     knee = KneeLocator(res[:, 0], res[:, 2], curve_nature="convex", curve_direction="increasing")

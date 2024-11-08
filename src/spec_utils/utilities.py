@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
-
 import numpy as np
 
 
-def find_groups_by_chained_bounds(
-    arr: np.ndarray, distance: float = 1.00235, tolerance: float = 1e-4
+def find_groups_within_bounds(
+    arr: np.ndarray,
+    distance: float = 1.00235,
+    tolerance: float = 1e-4,
+    keep_singletons: bool = False,
 ) -> list[tuple[list[int], list[float]]]:
     """
     Find groups of values within specified bounds. For each group, subsequent matches are
@@ -19,6 +20,7 @@ def find_groups_by_chained_bounds(
         arr (np.ndarray): The sorted input array.
         distance (float): Default distance
         tolerance (float): Tolerance around the distance.
+        keep_singletons (bool): Whether to include singletons in the output.
 
     Returns
     -------
@@ -32,6 +34,7 @@ def find_groups_by_chained_bounds(
     groups = []
     n = len(arr)
     visited = set()  # Keep track of indices already included in groups
+    min_in_group = 1 if not keep_singletons else 0
 
     for i in range(n):
         if i in visited:
@@ -53,12 +56,12 @@ def find_groups_by_chained_bounds(
             elif diff > max_distance:
                 break  # Exit early since array is sorted
 
-        if len(group_indices) > 1:  # Only include groups with more than one element
+        if len(group_indices) > min_in_group:  # Only include groups with more than one element
             groups.append((group_indices, group_values))
     return groups
 
 
-def find_groups_by_chained_bounds_with_weights(
+def find_groups_within_bounds_weighted(
     arr: np.ndarray,
     weights: np.ndarray,
     distance: float = 1.00235,
@@ -66,7 +69,7 @@ def find_groups_by_chained_bounds_with_weights(
     weight_threshold: float = 0.8,
     keep_singletons: bool = False,
     compare_to_last: bool = True,
-) -> List[Tuple[List[int], List[float]]]:
+) -> list[tuple[list[int], list[float]]]:
     """
     Find groups of values using distance bounds and weights. For each group, subsequent matches
     are checked against the last entry in the group.

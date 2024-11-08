@@ -10,6 +10,7 @@ def find_groups_within_bounds(
     distance: float = 1.00235,
     tolerance: float = 1e-4,
     keep_singletons: bool = False,
+    max_in_group: int = 6,
 ) -> list[tuple[list[int], list[float]]]:
     """
     Find groups of values within specified bounds. For each group, subsequent matches are
@@ -21,6 +22,7 @@ def find_groups_within_bounds(
         distance (float): Default distance
         tolerance (float): Tolerance around the distance.
         keep_singletons (bool): Whether to include singletons in the output.
+        max_in_group (int): Maximum number of elements in a group.
 
     Returns
     -------
@@ -48,7 +50,7 @@ def find_groups_within_bounds(
         last_index = i
         for j in range(i + 1, n):
             diff = arr[j] - arr[last_index]
-            if min_distance <= diff <= max_distance:
+            if min_distance <= diff <= max_distance and len(group_indices) < max_in_group:
                 group_indices.append(j)
                 group_values.append(arr[j])
                 visited.add(j)
@@ -69,6 +71,7 @@ def find_groups_within_bounds_weighted(
     weight_threshold: float = 0.8,
     keep_singletons: bool = False,
     compare_to_last: bool = True,
+    max_in_group: int = 6,
 ) -> list[tuple[list[int], list[float]]]:
     """
     Find groups of values using distance bounds and weights. For each group, subsequent matches
@@ -83,6 +86,7 @@ def find_groups_within_bounds_weighted(
         weight_threshold (float): Minimum weight required to link points in the same group.
         keep_singletons (bool): Whether to include singletons in the output.
         compare_to_last (bool): Whether to compare subsequent matches to the last entry in the group.
+        max_in_group (int): Maximum number of elements in a group.
 
     Returns
     -------
@@ -111,7 +115,11 @@ def find_groups_within_bounds_weighted(
         reference_index = i  # Initially compare to the first entry
         for j in range(i + 1, n):
             diff = arr[j] - arr[last_index]
-            if min_distance <= diff <= max_distance and weights[reference_index, j] >= weight_threshold:
+            if (
+                min_distance <= diff <= max_distance
+                and weights[reference_index, j] >= weight_threshold
+                and len(group_indices) < max_in_group
+            ):
                 group_indices.append(j)
                 group_values.append(arr[j])
                 visited.add(j)

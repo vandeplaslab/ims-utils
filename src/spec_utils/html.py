@@ -41,6 +41,44 @@ def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:
     return fig
 
 
+def make_overlay_spectrum(
+    spectra: dict[str, tuple[np.ndarray, np.ndarray]], px: np.ndarray = None, py: np.ndarray = None
+) -> go.Figure:
+    """Export Plotly mass spectrum as HTML document."""
+    import plotly.graph_objects as go
+
+    # Create a figure
+    fig = go.Figure()
+
+    # Add the mass spectrum line
+    for name, (mz_x, mz_y) in spectra.items():
+        fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
+
+    if px is not None:
+        if py is None:
+            for x in px:
+                fig.add_vline(x=x, line_width=1, line_dash="dash", line_color="black")
+        else:
+            fig.add_trace(go.Scatter(x=px, y=py, mode="markers", name="peaks", marker=dict(color="black", size=10)))
+    # Update x/y min/max
+    x_min = min(mz_x.min() for mz_x, _ in spectra.values())
+    x_max = max(mz_x.max() for mz_x, _ in spectra.values())
+    fig.update_xaxes(range=[x_min, x_max])
+    y_max = max(mz_y.max() for _, mz_y in spectra.values())
+    fig.update_yaxes(range=[0, y_max * 1.05])
+
+    # Update layout
+    fig.update_layout(
+        title="Mass Spectrum",
+        xaxis_title="m/z",
+        yaxis_title="Intensity",
+        template="plotly_white",
+        width=1200,  # Adjust width here
+        height=800,  # Adjust height here
+    )
+    return fig
+
+
 def make_spectrum_with_scatter(
     mz_x: np.ndarray, mz_y: np.ndarray, name: str, mz_x_scatter: np.ndarray, mz_y_scatter: np.ndarray, name_scatter: str
 ) -> go.Figure:

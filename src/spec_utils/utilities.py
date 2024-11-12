@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import numpy as np
+from koyo.spectrum import ppm_to_delta_mass
 
 
 def find_groups_within_bounds(
     arr: np.ndarray,
     distance: float = 1.00235,
     tolerance: float = 1e-4,
+    ppm: float | None = None,
     keep_singletons: bool = False,
     max_in_group: int = 6,
 ) -> list[tuple[list[int], list[float]]]:
@@ -30,6 +32,9 @@ def find_groups_within_bounds(
             - A list of indices of the matching data points.
             - A list of corresponding values from the array.
     """
+    if ppm:
+        tolerance = 0
+
     min_distance = distance - tolerance
     max_distance = distance + tolerance
 
@@ -45,6 +50,11 @@ def find_groups_within_bounds(
         group_indices = [i]
         group_values = [arr[i]]
         visited.add(i)
+
+        if ppm:
+            tolerance = ppm_to_delta_mass(arr[i], ppm)
+            min_distance = distance - tolerance
+            max_distance = distance + tolerance
 
         # Check subsequent elements for matches relative to the last group member
         last_index = i
@@ -68,6 +78,7 @@ def find_groups_within_bounds_weighted(
     weights: np.ndarray,
     distance: float = 1.00235,
     tolerance: float = 1e-4,
+    ppm: float | None = None,
     weight_threshold: float = 0.8,
     keep_singletons: bool = False,
     compare_to_last: bool = True,
@@ -94,6 +105,9 @@ def find_groups_within_bounds_weighted(
             - A list of indices of the matching data points.
             - A list of corresponding values from the array.
     """
+    if ppm:
+        tolerance = 0
+
     min_distance = distance - tolerance
     max_distance = distance + tolerance
 
@@ -109,6 +123,11 @@ def find_groups_within_bounds_weighted(
         group_indices = [i]
         group_values = [arr[i]]
         visited.add(i)
+
+        if ppm:
+            tolerance = ppm_to_delta_mass(arr[i], ppm)
+            min_distance = distance - tolerance
+            max_distance = distance + tolerance
 
         # Check subsequent elements for matches relative to the last group member
         last_index = i

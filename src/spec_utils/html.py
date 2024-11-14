@@ -42,7 +42,10 @@ def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:
 
 
 def make_overlay_spectrum(
-    spectra: dict[str, tuple[np.ndarray, np.ndarray]], px: np.ndarray = None, py: np.ndarray = None
+    spectra: dict[str, tuple[np.ndarray, np.ndarray]],
+    px: np.ndarray = None,
+    py: np.ndarray = None,
+    normalize: bool = True,
 ) -> go.Figure:
     """Export Plotly mass spectrum as HTML document."""
     import plotly.graph_objects as go
@@ -52,6 +55,8 @@ def make_overlay_spectrum(
 
     # Add the mass spectrum line
     for name, (mz_x, mz_y) in spectra.items():
+        if normalize:
+            mz_y = mz_y / mz_y.max()
         fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
 
     if px is not None:
@@ -59,7 +64,7 @@ def make_overlay_spectrum(
             for x in px:
                 fig.add_vline(x=x, line_width=1, line_dash="dash", line_color="black")
         else:
-            fig.add_trace(go.Scatter(x=px, y=py, mode="markers", name="peaks", marker=dict(color="black", size=10)))
+            fig.add_trace(go.Scatter(x=px, y=py, mode="markers", name="peaks", marker={"color": "black", "size": 10}))
     # Update x/y min/max
     x_min = min(mz_x.min() for mz_x, _ in spectra.values())
     x_max = max(mz_x.max() for mz_x, _ in spectra.values())
@@ -114,9 +119,9 @@ def make_butterfly_spectrum(
     fig = go.Figure()
 
     # Add the mass spectrum line
-    fig.add_trace(go.Scatter(x=mz_x, y=mz_y_top / mz_y_top.max(), mode="lines", name=name_top, line=dict(color="blue")))
+    fig.add_trace(go.Scatter(x=mz_x, y=mz_y_top / mz_y_top.max(), mode="lines", name=name_top, line={"color": "blue"}))
     fig.add_trace(
-        go.Scatter(x=mz_x, y=-mz_y_bottom / mz_y_bottom.max(), mode="lines", name=name_bottom, line=dict(color="red"))
+        go.Scatter(x=mz_x, y=-mz_y_bottom / mz_y_bottom.max(), mode="lines", name=name_bottom, line={"color": "red"})
     )
 
     # Update layout
@@ -151,8 +156,8 @@ def make_difference_spectrum(
     fig = go.Figure()
 
     # Add the mass spectrum line
-    fig.add_trace(go.Scatter(x=mz_x, y=mz_y_top, mode="lines", name=name_top, line=dict(color="blue")))
-    fig.add_trace(go.Scatter(x=mz_x, y=mz_y_bottom, mode="lines", name=name_bottom, line=dict(color="red")))
+    fig.add_trace(go.Scatter(x=mz_x, y=mz_y_top, mode="lines", name=name_top, line={"color": "blue"}))
+    fig.add_trace(go.Scatter(x=mz_x, y=mz_y_bottom, mode="lines", name=name_bottom, line={"color": "red"}))
 
     # Update layout
     fig.update_layout(

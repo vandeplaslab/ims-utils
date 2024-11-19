@@ -41,6 +41,60 @@ def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:
     return fig
 
 
+def make_peaks_spectrum(
+    spectra: dict[str, tuple[np.ndarray, np.ndarray]],
+    peaks: np.ndarray,
+    window: float = 0.1,
+    normalize: bool = False,
+    n_cols: int = 3,
+) -> go.Figure:
+    """Export Plotly mass spectrum as HTML document."""
+    import plotly.graph_objects as go
+    from koyo.utilities import get_array_window
+    from plotly.subplots import make_subplots
+
+    peaks = np.asarray(peaks)
+    n_peaks = len(peaks)
+    n_rows = (n_peaks + n_cols - 1) // n_cols
+    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink", "gray", "olive", "cyan"]
+
+    # Create a figure
+    fig = make_subplots(rows=n_rows, cols=n_cols, subplot_titles=[f"Peak {peaks[i]:.3f}" for i in range(n_peaks)])
+    for i, peak in enumerate(peaks):
+        row, col = (i // n_cols + 1, i % n_cols + 1)
+        for j, (name, (mz_x, mz_y)) in enumerate(spectra.items()):
+            mz_x_window, mz_y_window = get_array_window(mz_x, peak - window, peak + window, mz_y)
+            if normalize:
+                mz_y_window = mz_y_window / mz_y_window.max()
+            color = colors[j]
+            fig.add_trace(
+                go.Scatter(
+                    x=mz_x_window,
+                    y=mz_y_window,
+                    mode="lines",
+                    name=name,
+                    line={"color": color},
+                    showlegend=i == 0,
+                    legendgroup=name,
+                ),
+                row=row,
+                col=col,
+            )
+        fig.add_vline(x=peak, line_width=1, line_dash="dash", line_color="black", row=row, col=col)
+
+    # Update layout
+    fig.update_layout(
+        title="Mass Spectrum",
+        xaxis_title="m/z",
+        yaxis_title="Intensity",
+        template="plotly_white",
+        width=50 + 400 * n_cols,  # Adjust width here
+        height=350 * n_rows,  # Adjust height here
+        hoverlabel={"namelength": -1},
+    )
+    return fig
+
+
 def make_overlay_spectrum(
     spectra: dict[str, tuple[np.ndarray, np.ndarray]],
     px: np.ndarray = None,
@@ -54,10 +108,12 @@ def make_overlay_spectrum(
     fig = go.Figure()
 
     # Add the mass spectrum line
+    y_max = 0
     for name, (mz_x, mz_y) in spectra.items():
         if normalize:
             mz_y = mz_y / mz_y.max()
         fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
+        y_max = max(y_max, mz_y.max())
 
     if px is not None:
         if py is None:
@@ -69,7 +125,6 @@ def make_overlay_spectrum(
     x_min = min(mz_x.min() for mz_x, _ in spectra.values())
     x_max = max(mz_x.max() for mz_x, _ in spectra.values())
     fig.update_xaxes(range=[x_min, x_max])
-    y_max = max(mz_y.max() for _, mz_y in spectra.values())
     fig.update_yaxes(range=[0, y_max * 1.05])
 
     # Update layout
@@ -79,7 +134,8 @@ def make_overlay_spectrum(
         yaxis_title="Intensity",
         template="plotly_white",
         width=1200,  # Adjust width here
-        height=800,  # Adjust height here
+        height=700,  # Adjust height here
+        hoverlabel={"namelength": -1},
     )
     return fig
 

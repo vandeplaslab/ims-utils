@@ -47,6 +47,9 @@ def make_peaks_spectrum(
     window: float = 0.1,
     normalize: bool = False,
     n_cols: int = 3,
+    style="plotly_white",
+    width: int = 400,
+    height: int = 350,
 ) -> go.Figure:
     """Export Plotly mass spectrum as HTML document."""
     import plotly.graph_objects as go
@@ -57,6 +60,8 @@ def make_peaks_spectrum(
     n_peaks = len(peaks)
     n_rows = (n_peaks + n_cols - 1) // n_cols
     colors = ["blue", "red", "green", "orange", "purple", "brown", "pink", "gray", "olive", "cyan"]
+    if len(spectra) > len(colors):
+        colors = [f"hsl({360 * i / len(spectra)}, 100%, 50%)" for i in range(len(spectra))]
 
     # Create a figure
     fig = make_subplots(rows=n_rows, cols=n_cols, subplot_titles=[f"Peak {peaks[i]:.3f}" for i in range(n_peaks)])
@@ -87,9 +92,9 @@ def make_peaks_spectrum(
         title="Mass Spectrum",
         xaxis_title="m/z",
         yaxis_title="Intensity",
-        template="plotly_white",
-        width=50 + 400 * n_cols,  # Adjust width here
-        height=350 * n_rows,  # Adjust height here
+        template=style,
+        width=50 + width * n_cols,  # Adjust width here
+        height=height * n_rows,  # Adjust height here
         hoverlabel={"namelength": -1},
     )
     return fig

@@ -102,8 +102,8 @@ def make_peaks_spectrum(
 
 def make_overlay_spectrum(
     spectra: dict[str, tuple[np.ndarray, np.ndarray]],
-    px: np.ndarray = None,
-    py: np.ndarray = None,
+    px: np.ndarray | None = None,
+    py: np.ndarray | None = None,
     normalize: bool = True,
 ) -> go.Figure:
     """Export Plotly mass spectrum as HTML document."""

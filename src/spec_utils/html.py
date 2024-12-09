@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 from koyo.typing import PathLike
+from koyo.utilities import find_nearest_index
 
 if ty.TYPE_CHECKING:
     import plotly.graph_objects as go
@@ -113,6 +114,7 @@ def make_overlay_spectrum(
     px: np.ndarray | None = None,
     py: np.ndarray | None = None,
     normalize: bool = True,
+    as_vline: bool = True,
 ) -> go.Figure:
     """Export Plotly mass spectrum as HTML document."""
     import plotly.graph_objects as go
@@ -122,18 +124,42 @@ def make_overlay_spectrum(
 
     # Add the mass spectrum line
     y_max = 0
+    ys_ = {}
     for name, (mz_x, mz_y) in spectra.items():
         if normalize:
             mz_y = mz_y / mz_y.max()
         fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
         y_max = max(y_max, mz_y.max())
+        if not as_vline and px is not None:
+            indices = find_nearest_index(mz_x, px)
+            ys_[name] = mz_y[indices]
 
     if px is not None:
-        if py is None:
+        if as_vline or py is not None:
             for x in px:
                 fig.add_vline(x=x, line_width=1, line_dash="dash", line_color="black")
         else:
-            fig.add_trace(go.Scatter(x=px, y=py, mode="markers", name="peaks", marker={"color": "black", "size": 10}))
+            if py is None:
+                for name, py in ys_.items():
+                    fig.add_trace(
+                        go.Scatter(
+                            x=px,
+                            y=py,
+                            mode="markers",
+                            name=f"{name} (peaks)",
+                            marker={"color": "black", "size": 10, "symbol": "diamond-tall", "opacity": 0.5},
+                        )
+                    )
+            else:
+                fig.add_trace(
+                    go.Scatter(
+                        x=px,
+                        y=py,
+                        mode="markers",
+                        name="peaks",
+                        marker={"color": "black", "size": 10, "symbol": "diamond-tall", "opacity": 0.5},
+                    )
+                )
     # Update x/y min/max
     x_min = min(mz_x.min() for mz_x, _ in spectra.values())
     x_max = max(mz_x.max() for mz_x, _ in spectra.values())

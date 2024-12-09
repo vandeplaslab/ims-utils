@@ -12,11 +12,19 @@ if ty.TYPE_CHECKING:
     import plotly.graph_objects as go
 
 
-def write_html(fig, filename: PathLike) -> None:
+def write_html(fig: go.Figure, filename: PathLike) -> None:
     """Write HTML to file."""
     filename = Path(filename)
     filename.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(filename), include_plotlyjs="cdn")
+
+
+def show_html(filename: PathLike) -> None:
+    """Show HTML in browser."""
+    import webbrowser
+
+    filename = Path(filename)
+    webbrowser.open(filename.as_uri())
 
 
 def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:

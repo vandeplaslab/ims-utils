@@ -13,6 +13,13 @@ if ty.TYPE_CHECKING:
     import plotly.graph_objects as go
 
 
+def _get_colors(n: int) -> list[str]:
+    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink", "gray", "olive", "cyan"]
+    if n > len(colors):
+        colors = [f"hsl({360 * i / n}, 100%, 50%)" for i in range(n)]
+    return colors
+
+
 def write_html(fig: go.Figure, filename: PathLike) -> None:
     """Write HTML to file."""
     filename = Path(filename)
@@ -43,7 +50,7 @@ def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:
         title="Mass Spectrum",
         xaxis_title="m/z",
         yaxis_title="Intensity",
-        template="plotly_white",
+        template="simple_white",
         width=1200,  # Adjust width here
         height=800,  # Adjust height here
     )
@@ -56,7 +63,7 @@ def make_peaks_spectrum(
     window: float = 0.1,
     normalize: bool = False,
     n_cols: int = 3,
-    style="plotly_white",
+    style="simple_white",
     width: int = 400,
     height: int = 350,
 ) -> go.Figure:
@@ -68,9 +75,7 @@ def make_peaks_spectrum(
     peaks = np.asarray(peaks)
     n_peaks = len(peaks)
     n_rows = (n_peaks + n_cols - 1) // n_cols
-    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink", "gray", "olive", "cyan"]
-    if len(spectra) > len(colors):
-        colors = [f"hsl({360 * i / len(spectra)}, 100%, 50%)" for i in range(len(spectra))]
+    colors = _get_colors(len(spectra))
 
     # Create a figure
     fig = make_subplots(rows=n_rows, cols=n_cols, subplot_titles=[f"Peak {peaks[i]:.3f}" for i in range(n_peaks)])
@@ -163,24 +168,29 @@ def make_overlay_spectrum(
     # Update x/y min/max
     x_min = min(mz_x.min() for mz_x, _ in spectra.values())
     x_max = max(mz_x.max() for mz_x, _ in spectra.values())
-    fig.update_xaxes(range=[x_min, x_max])
-    fig.update_yaxes(range=[0, y_max * 1.05])
 
     # Update layout
     fig.update_layout(
         title="Mass Spectrum",
         xaxis_title="m/z",
         yaxis_title="Intensity",
-        template="plotly_white",
+        template="simple_white",
         width=1200,  # Adjust width here
         height=700,  # Adjust height here
         hoverlabel={"namelength": -1},
+        xaxis={"range": [x_min, x_max]},
+        yaxis={"range": [0, y_max * 1.05]},
     )
     return fig
 
 
 def make_spectrum_with_scatter(
-    mz_x: np.ndarray, mz_y: np.ndarray, name: str, mz_x_scatter: np.ndarray, mz_y_scatter: np.ndarray, name_scatter: str
+    mz_x: np.ndarray,
+    mz_y: np.ndarray,
+    peaks: dict[str, tuple[np.ndarray, np.ndarray]],
+    name: str = "Spectrum",
+    marker_size: int = 5,
+    marker_opacity: float = 0.75,
 ) -> go.Figure:
     """Export Plotly mass spectrum as HTML document."""
     import plotly.graph_objects as go
@@ -188,18 +198,32 @@ def make_spectrum_with_scatter(
     # Create a figure
     fig = go.Figure()
 
+    colors = _get_colors(len(peaks))
+
     # Add the mass spectrum line
-    fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
-    fig.add_trace(go.Scatter(x=mz_x_scatter, y=mz_y_scatter, mode="markers", name=name_scatter))
+    y_max = mz_y.max()
+    fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name, line={"color": "black"}))
+    for scatter_name, (mz_x_scatter, mz_y_scatter) in peaks.items():
+        y_max = max(y_max, mz_y_scatter.max())
+        fig.add_trace(
+            go.Scatter(
+                x=mz_x_scatter,
+                y=mz_y_scatter,
+                mode="markers",
+                name=scatter_name,
+                marker={"color": colors.pop(0), "size": marker_size, "opacity": marker_opacity},
+            )
+        )
 
     # Update layout
     fig.update_layout(
         title="Mass Spectrum",
         xaxis_title="m/z",
         yaxis_title="Intensity",
-        template="plotly_white",
+        template="simple_white",
         width=1200,  # Adjust width here
         height=800,  # Adjust height here
+        yaxis={"range": [0, y_max * 1.05]},
     )
     return fig
 
@@ -224,7 +248,7 @@ def make_butterfly_spectrum(
         title="Mass Spectrum",
         xaxis_title="m/z",
         yaxis_title="Intensity",
-        template="plotly_white",
+        template="simple_white",
         width=1200,  # Adjust width here
         height=800,  # Adjust height here
     )
@@ -259,7 +283,7 @@ def make_difference_spectrum(
         title="Mass Spectrum",
         xaxis_title="m/z",
         yaxis_title="Intensity",
-        template="plotly_white",
+        template="simple_white",
         width=1200,  # Adjust width here
         height=800,  # Adjust height here
     )

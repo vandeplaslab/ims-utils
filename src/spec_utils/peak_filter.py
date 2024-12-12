@@ -49,20 +49,20 @@ class PeakFilter:
         self._indices_by_mass_defect = None
 
     def filter_by_mz(  # type: ignore[override]
-        self, mz_tolerance: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
+        self, mz_tol: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> npt.NDArray:
         """Identify groups of centroids."""
         from spec_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
-        assert mz_tolerance is not None and mz_tolerance > 0, "M/z tolerance must be greater than 0"
+        assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
         assert max_in_group is not None and max_in_group > 0, "Max in group must be greater than 0"
-        if not any([mz_ppm, mz_tolerance]):
-            raise ValueError("Either `mz_ppm` or `mz_tolerance` must be specified")
+        if not any([mz_ppm, mz_tol]):
+            raise ValueError("Either `mz_ppm` or `mz_tol` must be specified")
 
         with MeasureTimer() as timer:
             groups = find_groups_within_bounds(
-                self.mzs, tolerance=mz_tolerance, ppm=mz_ppm, keep_singletons=True, max_in_group=max_in_group
+                self.mzs, tolerance=mz_tol, ppm=mz_ppm, keep_singletons=True, max_in_group=max_in_group
             )
             self._indices_by_mz = filter_groups(groups, self.intensities)
             n = len(self.mzs) - len(self._indices_by_mz)
@@ -73,7 +73,8 @@ class PeakFilter:
         self,
         matrix: ty.Literal["dmaca", "mapca", "chca", "nedc"] | str,
         polarity: ty.Literal["auto", "positive", "negative"] | str = "auto",
-        max_ppm: float = 5,
+        mz_tol: float = 5e-3,
+        mz_ppm: float = 0,
         **_kwargs: ty.Any,
     ) -> npt.NDArray:
         """Identify groups of centroids."""
@@ -81,6 +82,10 @@ class PeakFilter:
         from koyo.utilities import find_nearest_index
 
         from spec_utils.assets import find_matrix
+
+        assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
+        if not any([mz_ppm, mz_tol]):
+            raise ValueError("Either `mz_ppm` or `mz_tol` must be specified")
 
         with MeasureTimer() as timer:
             matrix = matrix.lower()
@@ -96,8 +101,12 @@ class PeakFilter:
             # find indices
             matrix_mzs = peaklist.mzs.values
             matrix_indices = find_nearest_index(self.mzs, matrix_mzs)
-            ppm = abs(ppm_error(matrix_mzs, self.mzs[matrix_indices]))
-            indices_to_remove = matrix_indices[ppm < max_ppm]
+            if mz_ppm:
+                ppm = abs(ppm_error(matrix_mzs, self.mzs[matrix_indices]))
+                indices_to_remove = matrix_indices[ppm < mz_ppm]
+            else:
+                tol = np.abs(matrix_mzs - self.mzs[matrix_indices])
+                indices_to_remove = matrix_indices[tol < mz_tol]
             self._indices_by_matrix = np.setdiff1d(np.arange(len(self.mzs)), indices_to_remove)
             n_idx = len(self._indices_by_matrix)  # type: ignore[arg-type]
             n = len(self.mzs) - n_idx
@@ -207,20 +216,20 @@ class PeakFilter:
         return np.isin(found_mz, self.removed_mzs) and ppm < 5  # type: ignore[return-value]
 
     def group_into_isotope_groups(
-        self, mz_tolerance: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
+        self, mz_tol: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> GroupResult:
         """Create tentative isotope groups, based purely on m/z. Only consider the 'remaining m/zs'."""
         from spec_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
-        assert mz_tolerance is not None and mz_tolerance > 0, "M/z tolerance must be greater than 0"
+        assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
         assert max_in_group is not None and max_in_group > 0, "Max in group must be greater than 0"
-        if not any([mz_ppm, mz_tolerance]):
-            raise ValueError("Either `mz_ppm` or `mz_tolerance` must be specified")
+        if not any([mz_ppm, mz_tol]):
+            raise ValueError("Either `mz_ppm` or `mz_tol` must be specified")
 
         # isotope groups
         groups = find_groups_within_bounds(
-            self.remaining_mzs, tolerance=mz_tolerance, ppm=mz_ppm, keep_singletons=True, max_in_group=max_in_group
+            self.remaining_mzs, tolerance=mz_tol, ppm=mz_ppm, keep_singletons=True, max_in_group=max_in_group
         )
         # they need to be mapped to the original indices
         groups_ = []
@@ -242,6 +251,12 @@ class PeakFilter:
         if skip_singletons:
             groups = [group for group in groups if len(group[0]) > 1]
         return groups
+
+    def get_mzs_and_intensities_for(self, indices: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
+        """Return m/z and intensities for given indices."""
+        if indices is None:
+            raise ValueError("No indices to filter")
+        return self.mzs[indices], self.intensities[indices]
 
 
 def get_weights_for_indicies(weights: npt.NDArray, indices: list) -> npt.NDArray:

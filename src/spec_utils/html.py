@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from koyo.typing import PathLike
 from koyo.utilities import find_nearest_index
+from tqdm import tqdm
 
 if ty.TYPE_CHECKING:
     import plotly.graph_objects as go
@@ -79,7 +80,7 @@ def make_peaks_spectrum(
 
     # Create a figure
     fig = make_subplots(rows=n_rows, cols=n_cols, subplot_titles=[f"Peak {peaks[i]:.3f}" for i in range(n_peaks)])
-    for i, peak in enumerate(peaks):
+    for i, peak in enumerate(tqdm(peaks, desc="Adding peaks...")):
         row, col = (i // n_cols + 1, i % n_cols + 1)
         for j, (name, (mz_x, mz_y)) in enumerate(spectra.items()):
             mz_x_window, mz_y_window = get_array_window(mz_x, peak - window, peak + window, mz_y)

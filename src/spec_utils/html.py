@@ -73,6 +73,19 @@ def make_peaks_spectrum(
     from koyo.utilities import get_array_window
     from plotly.subplots import make_subplots
 
+    # get minimum and maximum m/z values
+    mz_min = min(mz_x.min() for mz_x, _ in spectra.values())
+    mz_max = max(mz_x.max() for mz_x, _ in spectra.values())
+
+    # validate peaks are within the m/z range and if not, exclude them
+    peaks_, excluded_peaks_ = [], []
+    for peak in peaks:
+        if mz_min <= peak <= mz_max:
+            peaks_.append(peak)
+        else:
+            excluded_peaks_.append(peak)
+    peaks = np.asarray(peaks_)
+
     peaks = np.asarray(peaks)
     n_peaks = len(peaks)
     n_rows = (n_peaks + n_cols - 1) // n_cols

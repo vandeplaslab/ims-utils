@@ -23,6 +23,7 @@ class PeakFilter:
     _groups: GroupResult | None = None
 
     _indices_by_mz: npt.NDArray | None = None
+    _indices_by_mz_merge: npt.NDArray | None = None
     _indices_by_matrix: npt.NDArray | None = None
     _indices_by_kendrick_mass: npt.NDArray | None = None
     _indices_by_mass_defect: npt.NDArray | None = None
@@ -44,7 +45,7 @@ class PeakFilter:
     def reset_filters(self) -> None:
         """Reset all filters."""
         self._indices_by_mz = None
-        self._indices_by_matrix = None
+        self._indices_by_mz_merge = None
         self._indices_by_kendrick_mass = None
         self._indices_by_mass_defect = None
 
@@ -69,6 +70,26 @@ class PeakFilter:
         logger.info(f"Found {len(self._indices_by_mz)} groups (reduction of {n}) in {timer()}")
         return self._indices_by_mz
 
+    def filter_by_mz_merge(
+        self, mz_tolerance: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
+    ) -> npt.NDArray:
+        """Filter by m/z values."""
+        from spec_utils.utilities import find_groups_within_bounds
+
+        # Validate inputs
+        assert mz_tolerance is not None and mz_tolerance > 0, "M/z tolerance must be greater than 0"
+        assert max_in_group is not None and max_in_group > 0, "Max in group must be greater than 0"
+        if not any([mz_ppm, mz_tolerance]):
+            raise ValueError("Either `mz_ppm` or `mz_tolerance` must be specified")
+        with MeasureTimer() as timer:
+            groups = find_groups_within_bounds(
+                self.mzs, tolerance=mz_tolerance, ppm=mz_ppm, keep_singletons=True, distance=0
+            )
+            self._indices_by_mz_merge = filter_groups(groups, self.intensities)
+            n = len(self.mzs) - len(self._indices_by_mz_merge)
+        logger.info(f"Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()}")
+        return self._indices_by_mz_merge
+
     def filter_by_matrix(
         self,
         matrix: ty.Literal["dmaca", "mapca", "chca", "nedc"] | str,
@@ -84,6 +105,9 @@ class PeakFilter:
 
         with MeasureTimer() as timer:
             matrix = matrix.lower()
+            if ";" in matrix:
+                matrix, polarity = matrix.split(";")
+
             polarity = polarity.lower()
             if polarity == "auto":
                 polarity = self.polarity
@@ -164,6 +188,7 @@ class PeakFilter:
         if not any(
             [
                 self._indices_by_mz is not None,
+                self._indices_by_mz_merge is not None,
                 self._indices_by_matrix is not None,
                 self._indices_by_kendrick_mass is not None,
                 self._indices_by_mass_defect is not None,
@@ -175,6 +200,7 @@ class PeakFilter:
         indices_to_remove = []
         for indices_ in [
             self._indices_by_mz,
+            self._indices_by_mz_merge,
             self._indices_by_matrix,
             self._indices_by_kendrick_mass,
             self._indices_by_mass_defect,

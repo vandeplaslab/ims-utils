@@ -44,6 +44,7 @@ class PeakFilter:
 
     def reset_filters(self) -> None:
         """Reset all filters."""
+        self._groups = None
         self._indices_by_mz = None
         self._indices_by_mz_merge = None
         self._indices_by_kendrick_mass = None

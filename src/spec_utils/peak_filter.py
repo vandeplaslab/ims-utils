@@ -301,6 +301,8 @@ def get_weights_for_indicies(weights: npt.NDArray, indices: list) -> npt.NDArray
 
 def filter_groups(groups: list[tuple[list[int], list[float]]], intensities: npt.NDArray) -> npt.NDArray:
     """Filter groups of centroids."""
+    from spec_utils.utilities import find_highest
+
     indices_to_keep = []
     for indices, _ in groups:
         index = find_highest(indices, intensities)
@@ -308,20 +310,10 @@ def filter_groups(groups: list[tuple[list[int], list[float]]], intensities: npt.
     return np.unique(indices_to_keep)
 
 
-def find_highest(indices: list[int], intensities: npt.NDArray) -> int:
-    """Find the highest intensity within a group."""
-    indices = np.asarray(indices)  # type: ignore[assignment]
-    if len(indices) == 1:
-        index = indices[0]
-    else:
-        ys = intensities[indices]
-        index = indices[np.argmax(ys)]
-
-    return index
-
-
 def get_info(indices: list[int], intensities: npt.NDArray) -> tuple[int, list[str]]:
     """Return information about each item in a group."""
+    from spec_utils.utilities import find_highest
+
     index = find_highest(indices, intensities)
     res = []
     for index_ in indices:

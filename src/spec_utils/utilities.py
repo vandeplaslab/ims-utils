@@ -6,6 +6,17 @@ import numpy as np
 from koyo.spectrum import ppm_to_delta_mass
 
 
+def find_highest(indices: list[int], intensities: np.ndarray) -> int:
+    """Find the highest intensity within a group."""
+    indices = np.asarray(indices)  # type: ignore[assignment]
+    if len(indices) == 1:
+        index = indices[0]
+    else:
+        ys = intensities[indices]
+        index = indices[np.argmax(ys)]
+    return index
+
+
 def find_groups_within_bounds(
     arr: np.ndarray,
     distance: float = 1.00235,

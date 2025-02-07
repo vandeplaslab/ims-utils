@@ -67,7 +67,7 @@ def make_peaks_spectrum(
     style="simple_white",
     width: int = 400,
     height: int = 350,
-        titles: list[str] | None = None,
+    titles: list[str] | None = None,
 ) -> go.Figure:
     """Export Plotly mass spectrum as HTML document."""
     import plotly.graph_objects as go
@@ -240,7 +240,7 @@ def make_spectrum_with_scatter(
         xaxis_title="m/z",
         yaxis_title="Intensity",
         template="simple_white",
-        width=1200,  # Adjust width here
+        width=1200,  #
         height=800,  # Adjust height here
         yaxis={"range": [0, y_max * 1.05]},
     )

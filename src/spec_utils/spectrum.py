@@ -24,6 +24,8 @@ def has_pyopenms() -> bool:
 def centwave_estimate_baseline_and_noise(y: np.ndarray) -> tuple[float, float]:
     """Calculate signal-to-noise ratio."""
     q_min, q_max = np.quantile(y, (0.05, 0.95))
+    if q_min == q_max == 0:
+        q_min, q_max = np.quantile(y[y > 0], (0.05, 0.95))
     indices = np.where((y > q_min) & (y < q_max))
     yt = y[indices]
     bl, nl = np.mean(yt), np.std(yt)

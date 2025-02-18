@@ -1,4 +1,5 @@
 """Test imimspy.processing.spectrum.py functions"""
+
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,7 @@ from ms_utils.smooth import gaussian
 from ms_utils.spectrum import maxima_centroid, parabolic_centroid
 
 BASE_PATH = Path(__file__).parent
-TEST_PATH = BASE_PATH / "test_data" / "test_mz_peaks_#0.npz"
+TEST_PATH = BASE_PATH / "_test_data" / "test_mz_peaks_#0.npz"
 
 
 def get_data():

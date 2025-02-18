@@ -35,6 +35,8 @@ dependencies = [
     "koyo",
     "msalign",
     "plotly",
+    "loguru",
+    "tqdm",
 ]
 
 # extras
@@ -43,7 +45,13 @@ dependencies = [
 oms = [
     "pyopenms>=2.7.0; python_version < '3.10'"
 ]
-test = ["pytest>=6.0", "pytest-cov"]
+batch = [
+    "pandas",
+    "scikit-learn",
+    "mpire",
+    "patsy",
+]
+test = ["pytest>=6.0", "pytest-cov", "pytest-pretty"]
 dev = [
     "black",
     "ipython",
@@ -120,8 +128,18 @@ extend-ignore = [
 # https://docs.pytest.org/en/6.2.x/customize.html
 [tool.pytest.ini_options]
 minversion = "6.0"
+console_output_style = "count"
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error:::ms_utils", # turn warnings from ms_utils into errors
+    "error:::napari", # turn warnings from napari into errors
+    "ignore::DeprecationWarning:mpire",
+]
+# options so that i can see the stdout and loguru logs
+addopts = [
+    "-s", "--maxfail=5",  "--durations=10",  "-ra", "--strict-markers", "--strict-config",
+    "--log-cli-level=DEBUG", "--log-cli-format=%(asctime)s - %(levelname)s - %(message)s"
+]
 
 # https://mypy.readthedocs.io/en/stable/config_file.html
 [tool.mypy]

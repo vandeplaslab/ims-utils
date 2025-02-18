@@ -1,6 +1,11 @@
 """Smooth."""
+
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter
+
+try:
+    from scipy.ndimage import gaussian_filter
+except ImportError:
+    from scipy.ndimage.filters import gaussian_filter
 from scipy.sparse import issparse
 
 

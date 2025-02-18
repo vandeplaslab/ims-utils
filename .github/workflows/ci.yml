@@ -52,7 +52,7 @@ jobs:
   # now add an additional job to combine and upload the coverage
   upload_coverage:
     if: always()
-    needs: [tests]
+    needs: [test]
     uses: pyapp-kit/workflows/.github/workflows/upload-coverage.yml@v2
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}

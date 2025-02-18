@@ -30,7 +30,7 @@ jobs:
       python-version: ${{ matrix.python-version }}
       pip-install-pre-release: ${{ github.event_name == 'schedule' }}
       report-failures: ${{ github.event_name == 'schedule' }}
-      extras: 'batch'
+      extras: 'batch,test'
     strategy:
       fail-fast: false
       matrix:

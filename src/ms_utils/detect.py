@@ -15,7 +15,7 @@ def noop_logger(msg: str) -> None:
 
 def get_best_snr(data: list[tuple[int, float, int]]) -> tuple[int, float, int]:
     """Calculate best SNR using the Knee method often used in K-Means clustering."""
-    from spec_utils._vendored.kneed import KneeLocator
+    from ms_utils._vendored.kneed import KneeLocator
 
     # convert data to numpy array
     res = np.asarray(data)

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from spec_utils.resample import get_resampler_from_mzs
+from ms_utils.resample import get_resampler_from_mzs
 
 
 def test_resampler():

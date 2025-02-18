@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from spec_utils.filters import FILTER_REGISTER, FilterBase, PpmResampling, register, transform
+from ms_utils.filters import FILTER_REGISTER, FilterBase, PpmResampling, register, transform
 
 BASE_PATH = Path(__file__).parent
 TEST_PATH = BASE_PATH / "test_data" / "test_mz_peaks_#0.npz"

@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 # https://peps.python.org/pep-0621/
 [project]
-name = "spec_utils"
+name = "ms-utils"
 description = "Spectrum utilities."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -52,12 +52,12 @@ dev = [
     "pre-commit",
     "rich",
     "ruff",
-    "spec_utils[test]",
+    "ms_utils[test]",
 ]
 
 [project.urls]
-homepage = "https://github.com/vandeplaslab/spec_utils"
-repository = "https://github.com/vandeplaslab/spec_utils"
+homepage = "https://github.com/vandeplaslab/ms-utils"
+repository = "https://github.com/vandeplaslab/ms-utils"
 
 # same as console_scripts entry point
 # [project.scripts]
@@ -69,7 +69,7 @@ repository = "https://github.com/vandeplaslab/spec_utils"
 # tomatoes = "spam:main_tomatoes"
 
 [tool.setuptools_scm]
-write_to = "src/spec_utils/_version.py"
+write_to = "src/ms_utils/_version.py"
 
 # https://github.com/psf/black
 [tool.black]
@@ -150,7 +150,7 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-source = ["spec_utils"]
+source = ["ms_utils"]
 
 # https://github.com/mgedmin/check-manifest#configuration
 [tool.check-manifest]

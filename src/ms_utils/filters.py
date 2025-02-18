@@ -271,7 +271,7 @@ class BaselineALS(FilterBase):
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
         """Filter."""
-        from spec_utils.baseline import als
+        from ms_utils.baseline import als
 
         baseline = als(intensity_array, self.lam, self.p)
         return mz_array, intensity_array - baseline
@@ -287,7 +287,7 @@ class BaselineModifiedALS(FilterBase):
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
         """Filter."""
-        from spec_utils.baseline import arpls
+        from ms_utils.baseline import arpls
 
         baseline = arpls(intensity_array, self.lam, self.p, niter=self.n_iter)
         return mz_array, intensity_array - baseline
@@ -303,7 +303,7 @@ class BaselinePolynomial(FilterBase):
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
         """Filter."""
-        from spec_utils._vendored.peakutils import baseline
+        from ms_utils._vendored.peakutils import baseline
 
         baseline = baseline(intensity_array, self.order)
         return mz_array, intensity_array - baseline

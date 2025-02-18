@@ -7,7 +7,7 @@ import typing as ty
 import numpy as np
 from koyo.spectrum import ppm_diff
 
-from spec_utils.filters import PpmResampling
+from ms_utils.filters import PpmResampling
 
 
 class Object(ty.Protocol):

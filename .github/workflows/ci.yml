@@ -31,6 +31,9 @@ jobs:
       pip-install-pre-release: ${{ github.event_name == 'schedule' }}
       report-failures: ${{ github.event_name == 'schedule' }}
       extras: 'batch,test'
+      # changing this to "artifact" prevents uploading to codecov here,
+      # instead it uploads an artifact with the coverage data
+      coverage-upload: artifact
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +48,14 @@ jobs:
             os: macos-latest
           - python-version: "3.12"
             os: macos-latest
+
+  # now add an additional job to combine and upload the coverage
+  upload_coverage:
+    if: always()
+    needs: [tests]
+    uses: pyapp-kit/workflows/.github/workflows/upload-coverage.yml@v2
+    secrets:
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
 #  test:
 #    name: ${{ matrix.platform }} (${{ matrix.python-version }})

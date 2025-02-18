@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 # https://peps.python.org/pep-0621/
 [project]
-name = "ims-utils"
+name = "iims-utils"
 description = "Spectrum utilities."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -60,12 +60,12 @@ dev = [
     "pre-commit",
     "rich",
     "ruff",
-    "ms_utils[test]",
+    "ims_utils[test]",
 ]
 
 [project.urls]
-homepage = "https://github.com/vandeplaslab/ms-utils"
-repository = "https://github.com/vandeplaslab/ms-utils"
+homepage = "https://github.com/vandeplaslab/ims-utils"
+repository = "https://github.com/vandeplaslab/ims-utils"
 
 # same as console_scripts entry point
 # [project.scripts]
@@ -77,7 +77,7 @@ repository = "https://github.com/vandeplaslab/ms-utils"
 # tomatoes = "spam:main_tomatoes"
 
 [tool.setuptools_scm]
-write_to = "src/ms_utils/_version.py"
+write_to = "src/ims_utils/_version.py"
 
 # https://github.com/psf/black
 [tool.black]
@@ -131,8 +131,7 @@ minversion = "6.0"
 console_output_style = "count"
 testpaths = ["tests"]
 filterwarnings = [
-    "error:::ms_utils", # turn warnings from ms_utils into errors
-    "error:::napari", # turn warnings from napari into errors
+    "error:::ims_utils", # turn warnings from ims_utils into errors
     "ignore::DeprecationWarning:mpire",
 ]
 # options so that i can see the stdout and loguru logs
@@ -168,7 +167,7 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-source = ["ms_utils"]
+source = ["ims_utils"]
 
 # https://github.com/mgedmin/check-manifest#configuration
 [tool.check-manifest]

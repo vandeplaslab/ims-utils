@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ms_utils.internorm import (
+from ims_utils.internorm import (
     calculate_mean_inter_normalization,
     calculate_median_inter_normalization,
     calculate_mfc_inter_normalization,

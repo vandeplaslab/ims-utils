@@ -22,7 +22,7 @@ from koyo.utilities import is_installed
 from loguru import logger
 from tqdm import tqdm
 
-from ms_utils.batchnorm.utilities import (
+from ims_utils.batchnorm.utilities import (
     compute_init_values_parametric,
     compute_values_non_parametric,
     compute_weights,

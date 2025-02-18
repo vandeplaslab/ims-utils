@@ -54,7 +54,7 @@ class PeakFilter:
         self, mz_tol: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> npt.NDArray:
         """Identify groups of centroids."""
-        from ms_utils.utilities import find_groups_within_bounds
+        from ims_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
         assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
@@ -75,7 +75,7 @@ class PeakFilter:
         self, mz_tolerance: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> npt.NDArray:
         """Filter by m/z values."""
-        from ms_utils.utilities import find_groups_within_bounds
+        from ims_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
         assert mz_tolerance is not None and mz_tolerance > 0, "M/z tolerance must be greater than 0"
@@ -103,7 +103,7 @@ class PeakFilter:
         from koyo.spectrum import ppm_error
         from koyo.utilities import find_nearest_index
 
-        from ms_utils.assets import find_matrix
+        from ims_utils.assets import find_matrix
 
         assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
         if not any([mz_ppm, mz_tol]):
@@ -142,7 +142,7 @@ class PeakFilter:
         self, ref: str | float, filters: list[tuple[float, float, float, float]], **_kwargs: ty.Any
     ) -> npt.NDArray:
         """Filter by Kendrick mass defect."""
-        from ms_utils.kendrick import calculate_kendrick_mass_defect, filter_by_rules
+        from ims_utils.kendrick import calculate_kendrick_mass_defect, filter_by_rules
 
         with MeasureTimer() as timer:
             km, kmd = calculate_kendrick_mass_defect(self.mzs, ref)
@@ -246,7 +246,7 @@ class PeakFilter:
         self, mz_tol: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> GroupResult:
         """Create tentative isotope groups, based purely on m/z. Only consider the 'remaining m/zs'."""
-        from ms_utils.utilities import find_groups_within_bounds
+        from ims_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
         assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
@@ -301,7 +301,7 @@ def get_weights_for_indicies(weights: npt.NDArray, indices: list) -> npt.NDArray
 
 def filter_groups(groups: list[tuple[list[int], list[float]]], intensities: npt.NDArray) -> npt.NDArray:
     """Filter groups of centroids."""
-    from ms_utils.utilities import find_highest
+    from ims_utils.utilities import find_highest
 
     indices_to_keep = []
     for indices, _ in groups:
@@ -312,7 +312,7 @@ def filter_groups(groups: list[tuple[list[int], list[float]]], intensities: npt.
 
 def get_info(indices: list[int], intensities: npt.NDArray) -> tuple[int, list[str]]:
     """Return information about each item in a group."""
-    from ms_utils.utilities import find_highest
+    from ims_utils.utilities import find_highest
 
     index = find_highest(indices, intensities)
     res = []

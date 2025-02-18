@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ms_utils.batchnorm import HAS_COMBAT, HAS_RECOMBAT, ReComBat, combat, combine_arrays, create_batches
+from ims_utils.batchnorm import HAS_COMBAT, HAS_RECOMBAT, ReComBat, combat, combine_arrays, create_batches
 
 ARRAY_2D = np.random.randint(0, 255, (100, 10)) * 1.0
 DATA_2D = {"a": ARRAY_2D, "b": ARRAY_2D * 2.0, "c": ARRAY_2D * 0.5}

@@ -5,13 +5,18 @@ This code is copied from the peakutils source code.
 Code: https://bitbucket.org/lucashnegri/peakutils/src/master/
 
 """
+
 import math
 import typing as ty
 
 import numpy as np
 import scipy.linalg as LA
 from scipy import optimize
-from scipy.integrate import simps
+
+try:
+    from scipy.integrate import simps as simpson
+except ImportError:
+    from scipy.integrate import simpson
 
 eps = np.finfo(float).eps
 
@@ -206,9 +211,9 @@ def centroid2(y: np.ndarray, x: ty.Optional[np.ndarray] = None, dx: float = 1.0)
     if x is None:
         x = np.arange(yt.size, dtype="float") * dx
 
-    normaliser = simps(yt, x)
-    centroid = simps(x * yt, x) / normaliser
-    var = simps((x - centroid) ** 2 * yt, x) / normaliser
+    normaliser = simpson(yt, x)
+    centroid = simpson(x * yt, x) / normaliser
+    var = simpson((x - centroid) ** 2 * yt, x) / normaliser
     return centroid, np.sqrt(var)
 
 
@@ -231,7 +236,7 @@ def gaussian(x: float, ampl: float, center: float, dev: float):
     float
         Value of the specified Gaussian at *x*
     """
-    return ampl * np.exp(-((x - float(center)) ** 2) / (2.0 * dev ** 2 + eps))
+    return ampl * np.exp(-((x - float(center)) ** 2) / (2.0 * dev**2 + eps))
 
 
 def gaussian_fit(x: np.ndarray, y: np.ndarray, center_only: bool = True):

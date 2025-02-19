@@ -1,9 +1,5 @@
 name: CI
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   push:
     branches:
@@ -14,6 +10,10 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * 0" # every week (for --pre release tests)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check-manifest:

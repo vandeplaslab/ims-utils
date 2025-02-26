@@ -20,6 +20,8 @@ def calculate_mfc_inter_normalization(centroids: dict[str, np.ndarray]) -> tuple
     """
     if not centroids:
         raise ValueError("No centroids found.")
+    if len(centroids) == 1:
+        raise ValueError("Only one centroid found. Inter-normalization is not possible.")
 
     # Compute mean fold changes in a vectorized manner
     centroids_ref = np.array(
@@ -72,6 +74,8 @@ def calculate_mean_inter_normalization(centroids: dict[str, np.ndarray]) -> tupl
     """Calculate inter-normalization vector of values."""
     if not centroids:
         raise ValueError("No centroids found.")
+    if len(centroids) == 1:
+        raise ValueError("Only one centroid found. Inter-normalization is not possible.")
 
     # Compute the mean vector for each centroid
     centroids_ref = np.array([np.mean(centroid, axis=0) for centroid in centroids.values()])
@@ -90,6 +94,8 @@ def calculate_median_inter_normalization(centroids: dict[str, np.ndarray]) -> tu
     """Calculate inter-normalization vector of values."""
     if not centroids:
         raise ValueError("No centroids found.")
+    if len(centroids) == 1:
+        raise ValueError("Only one centroid found. Inter-normalization is not possible.")
 
     # Compute the mean vector for each centroid
     centroids_ref = np.array([np.mean(centroid, axis=0) for centroid in centroids.values()])
@@ -108,6 +114,8 @@ def calculate_tic_inter_normalization(tics: dict[str, np.ndarray]) -> tuple[list
     """Calculate inter-normalization vector of values."""
     if not tics:
         raise ValueError("No TICs found.")
+    if len(tics) == 1:
+        raise ValueError("Only one TIC found. Inter-normalization is not possible.")
     # Compute mean of each TIC efficiently using a list comprehension
     tic_ref = np.array([np.mean(tic) for tic in tics.values()], dtype=np.float32)
     # Compute the median and normalization factors

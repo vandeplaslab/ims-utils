@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 from koyo.typing import PathLike
-from koyo.utilities import find_nearest_index
+from koyo.utilities import find_nearest_index, get_array_window
 from tqdm import tqdm
 
 if ty.TYPE_CHECKING:
@@ -139,6 +139,8 @@ def make_overlay_spectrum(
     py: np.ndarray | None = None,
     normalize: bool = True,
     as_vline: bool = True,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
 ) -> go.Figure:
     """Export Plotly mass spectrum as HTML document."""
     import plotly.graph_objects as go
@@ -152,7 +154,11 @@ def make_overlay_spectrum(
     for name, (mz_x, mz_y) in spectra.items():
         if normalize:
             mz_y = mz_y / mz_y.max()
-        fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
+        if mz_min is not None or mz_max is not None:
+            x, y = get_array_window(mz_x, mz_min or mz_x.min(), mz_max or mz_x.max(), mz_y)
+            fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name))
+        else:
+            fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
         y_max = max(y_max, mz_y.max())
         if not as_vline and px is not None:
             indices = find_nearest_index(mz_x, px)
@@ -185,8 +191,8 @@ def make_overlay_spectrum(
                     )
                 )
     # Update x/y min/max
-    x_min = min(mz_x.min() for mz_x, _ in spectra.values())
-    x_max = max(mz_x.max() for mz_x, _ in spectra.values())
+    x_min = mz_min or min(mz_x.min() for mz_x, _ in spectra.values())
+    x_max = mz_max or max(mz_x.max() for mz_x, _ in spectra.values())
 
     # Update layout
     fig.update_layout(

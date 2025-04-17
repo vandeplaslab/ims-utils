@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import typing as ty
 import warnings
 from bisect import bisect_left, bisect_right
 from contextlib import suppress
@@ -50,7 +51,7 @@ def oms_centroid(
     spacing_difference: float = 1.5,
     spacing_difference_gap: float = 4.0,
     snr_auto_mode: int = 0,
-    **_kwargs,
+    **_kwargs: ty.Any,
 ) -> tuple[np.ndarray, np.ndarray]:
     """PyOpenMS based centroiding."""
     import pyopenms as oms  # type: ignore
@@ -181,7 +182,7 @@ def _parabolic_centroid(
     return mzs_parabolic[mask], intensities_parabolic[mask]
 
 
-def fast_find_peaks(y: np.ndarray, height: int = 0) -> np.ndarray:
+def fast_find_peaks(y: np.ndarray, height: float = 0) -> np.ndarray:
     """Faster implementation of find_peaks without all the bells and whistles."""
     peaks, left_edges, right_edges = _local_maxima_1d(y)
 
@@ -190,10 +191,10 @@ def fast_find_peaks(y: np.ndarray, height: int = 0) -> np.ndarray:
         hmin, hmax = _unpack_condition_args(height, y, peaks)
         keep = _select_by_property(peak_heights, hmin, hmax)
         peaks = peaks[keep]
-    return peaks
+    return peaks  # type: ignore[no-any-return]
 
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def _local_maxima_1d(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Find local maxima in a 1D array.
@@ -241,10 +242,10 @@ def _local_maxima_1d(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     return midpoints[:m], left_edges[:m], right_edges[:m]
 
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def find_maximum(
     mz_array: np.ndarray, int_array: np.ndarray, centroid_x: np.ndarray, mask: np.ndarray, weighted_bins: int
-):
+) -> np.ndarray:
     """Find maxima."""
     result = np.zeros((3, len(centroid_x)))
 
@@ -267,7 +268,7 @@ def find_maximum(
     return np.asarray(result)
 
 
-def resample_ppm(new_mz: np.ndarray, mz_array: np.ndarray, intensity_array: np.ndarray):
+def resample_ppm(new_mz: np.ndarray, mz_array: np.ndarray, intensity_array: np.ndarray) -> np.ndarray:
     """Resample array at specified ppm."""
     mz_idx = np.digitize(mz_array, new_mz, True)
 
@@ -279,18 +280,25 @@ def resample_ppm(new_mz: np.ndarray, mz_array: np.ndarray, intensity_array: np.n
     return y_ppm
 
 
-def interpolate_ppm(new_mz: np.ndarray, mz_array: np.ndarray, intensity_array: np.ndarray):
+def interpolate_ppm(
+    new_mz: np.ndarray, mz_array: np.ndarray, intensity_array: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Resample array at specified ppm."""
     func = interp1d(mz_array, intensity_array, fill_value=0, bounds_error=False)
     return new_mz, func(new_mz)
 
 
-def downsample(array_signal, n_up=2, n_down=20, ds_filter="upfirdn"):
+def downsample(
+    array: np.ndarray,
+    n_up: int = 2,
+    n_down: int = 20,
+    ds_filter: ty.Literal["fir", "upfirdn", "decimate", "poly", "polynomial", "fft"] = "upfirdn",
+) -> np.ndarray:
     """Downsample signal using one of multiple methods.
 
     Parameters
     ----------
-    array_signal : np.array, shape=(n_dt)
+    array : np.array, shape=(n_dt)
         array to be downsampled
     n_up : int
         upsampling rate
@@ -301,22 +309,22 @@ def downsample(array_signal, n_up=2, n_down=20, ds_filter="upfirdn"):
 
     Returns
     -------
-    downsampled_signal : np.array
+    ds_array : np.array
         downsampled signal
     """
     ratio = n_down / n_up
-    out_size = math.ceil(array_signal.shape[0] / ratio)
+    out_size = math.ceil(array.shape[0] / ratio)
     if ds_filter in ["fir", "upfirdn"]:
-        downsampled_signal = upfirdn([1], array_signal, n_up, n_down)
+        ds_array = upfirdn([1], array, n_up, n_down)
     elif ds_filter == "decimate":
-        downsampled_signal = decimate(array_signal, math.floor(ratio), ftype="fir")
+        ds_array = decimate(array, math.floor(ratio), ftype="fir")
     elif ds_filter in ["poly", "polynomial"]:
-        downsampled_signal = resample_poly(array_signal, n_up, n_down)
+        ds_array = resample_poly(array, n_up, n_down)
     elif ds_filter == "fft":
-        downsampled_signal = resample(array_signal, out_size)
+        ds_array = resample(array, out_size)
     else:
-        downsampled_signal = array_signal
-    return downsampled_signal
+        ds_array = array
+    return ds_array
 
 
 def merge_peaks_by_ppm(
@@ -453,26 +461,26 @@ def get_ppm_axis(mz_start: float, mz_end: float, ppm: float):
     return mz
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between(data: SimpleArrayLike, min_value: float, max_value: float):
     """Find indices between windows."""
     return np.where(np.logical_and(data >= min_value, data <= max_value))[0]
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between_tol(data: np.ndarray, value: float, tol: float):
     """Find indices between window and ppm."""
     return find_between(data, value - tol, value + tol)
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between_ppm(data: np.ndarray, value: float, ppm: float):
     """Find indices between window and ppm."""
     window = get_window_for_ppm(value, abs(ppm))
     return find_between(data, value - window, value + window)
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between_batch(array: np.ndarray, min_value: np.ndarray, max_value: np.ndarray):
     """Find indices between specified boundaries for many items."""
     min_indices = np.searchsorted(array, min_value, side="left")
@@ -557,7 +565,7 @@ def cluster_within_ppm(array: np.ndarray, ppm: float):
     return groups
 
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def ppm_to_delta_mass(mz: float | np.ndarray, ppm: float | np.ndarray) -> float | np.ndarray:
     """Converts a ppm error range to a delta mass in th (da?).
 
@@ -575,7 +583,7 @@ def ppm_to_delta_mass(mz: float | np.ndarray, ppm: float | np.ndarray) -> float 
     return ppm * mz / 1_000_000.0
 
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def ppm_error(measured_mz: float | np.ndarray, theoretical_mz: float | np.ndarray) -> float | np.ndarray:
     """Calculate ppm error."""
     return ((measured_mz - theoretical_mz) / theoretical_mz) * 1e6
@@ -595,7 +603,7 @@ def select_nearest(values: np.ndarray, values_to_find: np.ndarray, ppm: float = 
     return values[indices]
 
 
-def get_peaklist_window_for_ppm(peaklist: np.ndarray, ppm: float) -> ty.List[ty.Tuple[float, float]]:
+def get_peaklist_window_for_ppm(peaklist: np.ndarray, ppm: float) -> list[tuple[float, float]]:
     """Retrieve peaklist + tolerance."""
     _peaklist = []
     for mz in peaklist:
@@ -603,7 +611,7 @@ def get_peaklist_window_for_ppm(peaklist: np.ndarray, ppm: float) -> ty.List[ty.
     return _peaklist
 
 
-def get_peaklist_window_for_da(peaklist: np.ndarray, da: float) -> ty.List[ty.Tuple[float, float]]:
+def get_peaklist_window_for_da(peaklist: np.ndarray, da: float) -> list[tuple[float, float]]:
     """Retrieve peaklist + tolerance."""
     _peaklist = []
     for mz in peaklist:
@@ -611,7 +619,7 @@ def get_peaklist_window_for_da(peaklist: np.ndarray, da: float) -> ty.List[ty.Tu
     return _peaklist
 
 
-def get_mzs_for_tol(mzs: np.ndarray, tol: ty.Optional[float] = None, ppm: ty.Optional[float] = None):
+def get_mzs_for_tol(mzs: np.ndarray, tol: float | None = None, ppm: float | None = None):
     """Get min/max values for specified tolerance or ppm."""
     if (tol is None and ppm is None) or (tol == 0 and ppm == 0):
         raise ValueError("Please specify `tol` or `ppm`.")
@@ -629,7 +637,7 @@ def get_mzs_for_tol(mzs: np.ndarray, tol: ty.Optional[float] = None, ppm: ty.Opt
     return mzs_min, mzs_max
 
 
-def bisect_spectrum(x_spectrum, mz_value, tol: float) -> ty.Tuple[int, int]:
+def bisect_spectrum(x_spectrum: np.ndarray, mz_value: np.ndarray, tol: float) -> tuple[int, int]:
     """Get left/right window of extraction for peak."""
     ix_l, ix_u = (
         bisect_left(x_spectrum, mz_value - tol),
@@ -648,15 +656,15 @@ def bisect_spectrum(x_spectrum, mz_value, tol: float) -> ty.Tuple[int, int]:
     return ix_l, ix_u
 
 
-@numba.njit()
-def trim_axis(x: np.ndarray, y: np.ndarray, min_val: float, max_val: float):
+@numba.njit()  # type: ignore[misc]
+def trim_axis(x: np.ndarray, y: np.ndarray, min_val: float, max_val: float) -> tuple[np.ndarray, np.ndarray]:
     """Trim axis to prevent accumulation of edges."""
     mask = np.where((x >= min_val) & (x <= max_val))
     return x[mask], y[mask]
 
 
-@numba.njit()
-def set_ppm_axis(mz_x: np.ndarray, mz_y: np.ndarray, x: np.ndarray, y: np.ndarray):
+@numba.njit()  # type: ignore[misc]
+def set_ppm_axis(mz_x: np.ndarray, mz_y: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Set values for axis."""
     mz_idx = np.digitize(x, mz_x, True)
     for i, idx in enumerate(mz_idx):
@@ -735,3 +743,19 @@ def get_multi_ppm_offsets(mz_x: np.ndarray, ppm_ranges, min_spacing: float = 1e-
         full_offsets[start_idx:end_idx] = offsets[i]
         start_idx = end_idx
     return full_offsets
+
+
+def _precompile() -> None:
+    """Precompile numba functions."""
+    import os
+
+    if os.environ.get("IMSUTILS_JIT_PRE", "0") == "0":
+        return
+    for value in [10, np.array([10, 11])]:
+        ppm_error(value, value)
+    x = np.arange(100)
+    y = np.random.random(100)
+    fast_parabolic_centroid(x, y)
+
+
+_precompile()

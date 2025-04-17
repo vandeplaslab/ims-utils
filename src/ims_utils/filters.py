@@ -229,7 +229,7 @@ class PpmResampling(FilterBase):
     """Parts-per-million resampling."""
 
     def __init__(self, ppm: float, mz_start: float, mz_end: float):
-        from koyo.spectrum import get_ppm_axis
+        from ims_utils.spectrum import get_ppm_axis
 
         if ppm <= 0:
             raise ValueError("Please specify value of ppm that is larger than 0.")
@@ -354,7 +354,7 @@ class PpmRecalibrate(FilterBase):
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
         """Filter."""
-        from koyo.spectrum import get_ppm_offsets
+        from ims_utils.spectrum import get_ppm_offsets
 
         return mz_array - get_ppm_offsets(mz_array, self.ppm, every_n=self.every_n), intensity_array
 
@@ -381,7 +381,7 @@ class PpmPeakRecalibrate(FilterBase):
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
         """Filter."""
-        from koyo.spectrum import get_window_for_ppm
+        from ims_utils.spectrum import get_window_for_ppm
 
         offsets = np.asarray([get_window_for_ppm(p, self.ppm) for p in mz_array])
         return mz_array - offsets, intensity_array

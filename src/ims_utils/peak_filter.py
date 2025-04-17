@@ -100,7 +100,7 @@ class PeakFilter:
         **_kwargs: ty.Any,
     ) -> npt.NDArray:
         """Identify groups of centroids."""
-        from koyo.spectrum import ppm_error
+        from ims_utils.spectrum import ppm_error
         from koyo.utilities import find_nearest_index
 
         from ims_utils.assets import find_matrix
@@ -182,7 +182,7 @@ class PeakFilter:
 
     def find_index(self, mz: float) -> int:
         """Find index of a given m/z."""
-        from koyo.spectrum import ppm_error
+        from ims_utils.spectrum import ppm_error
         from koyo.utilities import find_nearest_index
 
         index = find_nearest_index(self.mzs, mz)
@@ -235,7 +235,7 @@ class PeakFilter:
 
     def is_removed(self, mz: float) -> bool:
         """Check if centroid is removed."""
-        from koyo.spectrum import ppm_error
+        from ims_utils.spectrum import ppm_error
         from koyo.utilities import find_nearest_value
 
         found_mz = find_nearest_value(self.mzs, mz)

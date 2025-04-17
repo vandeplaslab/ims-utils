@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from koyo.spectrum import ppm_to_delta_mass
+from ims_utils.spectrum import ppm_to_delta_mass
 
 
 def find_highest(indices: list[int], intensities: np.ndarray) -> int:

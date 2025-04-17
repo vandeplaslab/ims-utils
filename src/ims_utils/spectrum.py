@@ -11,6 +11,7 @@ import numba
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.signal import decimate, find_peaks, resample, resample_poly, upfirdn
+from scipy.signal._peak_finding import _select_by_property, _unpack_condition_args
 
 
 def has_pyopenms() -> bool:
@@ -129,35 +130,112 @@ def parabolic_centroid(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         peak_indices, _ = find_peaks(intensities, height=peak_threshold)
-        peak_left = peak_indices - 1
-        peak_right = peak_indices + 1
+        return _parabolic_centroid(mzs, intensities, peak_indices)
 
-        n = len(peak_indices)
 
-        x = np.zeros((n, 3))
-        y = np.zeros((n, 3))
+def fast_parabolic_centroid(
+    mzs: np.ndarray, intensities: np.ndarray, peak_threshold: float = 0
+) -> tuple[np.ndarray, np.ndarray]:
+    """Calculate centroid position.
 
-        x[:, 0] = mzs[peak_left]
-        x[:, 1] = mzs[peak_indices]
-        x[:, 2] = mzs[peak_right]
+    This function was taken from msiwarp package available on GitHub
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        peak_indices = fast_find_peaks(intensities, height=peak_threshold)
+        return _parabolic_centroid(mzs, intensities, peak_indices)
 
-        y[:, 0] = intensities[peak_left]
-        y[:, 1] = intensities[peak_indices]
-        y[:, 2] = intensities[peak_right]
 
-        a = ((y[:, 2] - y[:, 1]) / (x[:, 2] - x[:, 1]) - (y[:, 1] - y[:, 0]) / (x[:, 1] - x[:, 0])) / (
-            x[:, 2] - x[:, 0]
-        )
+def _parabolic_centroid(
+    mzs: np.ndarray, intensities: np.ndarray, peak_indices: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    peak_left = peak_indices - 1
+    peak_right = peak_indices + 1
 
-        b = (
-            (y[:, 2] - y[:, 1]) / (x[:, 2] - x[:, 1]) * (x[:, 1] - x[:, 0])
-            + (y[:, 1] - y[:, 0]) / (x[:, 1] - x[:, 0]) * (x[:, 2] - x[:, 1])
-        ) / (x[:, 2] - x[:, 0])
+    n = len(peak_indices)
 
-        mzs_parabolic = (1 / 2) * (-b + 2 * a * x[:, 1]) / a
-        intensities_parabolic = a * (mzs_parabolic - x[:, 1]) ** 2 + b * (mzs_parabolic - x[:, 1]) + y[:, 1]
-        mask = ~np.isnan(mzs_parabolic)
-        return mzs_parabolic[mask], intensities_parabolic[mask]
+    x = np.zeros((n, 3))
+    y = np.zeros((n, 3))
+
+    x[:, 0] = mzs[peak_left]
+    x[:, 1] = mzs[peak_indices]
+    x[:, 2] = mzs[peak_right]
+
+    y[:, 0] = intensities[peak_left]
+    y[:, 1] = intensities[peak_indices]
+    y[:, 2] = intensities[peak_right]
+
+    a = ((y[:, 2] - y[:, 1]) / (x[:, 2] - x[:, 1]) - (y[:, 1] - y[:, 0]) / (x[:, 1] - x[:, 0])) / (x[:, 2] - x[:, 0])
+
+    b = (
+        (y[:, 2] - y[:, 1]) / (x[:, 2] - x[:, 1]) * (x[:, 1] - x[:, 0])
+        + (y[:, 1] - y[:, 0]) / (x[:, 1] - x[:, 0]) * (x[:, 2] - x[:, 1])
+    ) / (x[:, 2] - x[:, 0])
+
+    mzs_parabolic = (1 / 2) * (-b + 2 * a * x[:, 1]) / a
+    intensities_parabolic = a * (mzs_parabolic - x[:, 1]) ** 2 + b * (mzs_parabolic - x[:, 1]) + y[:, 1]
+    mask = ~np.isnan(mzs_parabolic)
+    return mzs_parabolic[mask], intensities_parabolic[mask]
+
+
+def fast_find_peaks(y: np.ndarray, height: int = 0) -> np.ndarray:
+    """Faster implementation of find_peaks without all the bells and whistles."""
+    peaks, left_edges, right_edges = _local_maxima_1d(y)
+
+    if height is not None and height > 0:
+        peak_heights = y[peaks]
+        hmin, hmax = _unpack_condition_args(height, y, peaks)
+        keep = _select_by_property(peak_heights, hmin, hmax)
+        peaks = peaks[keep]
+    return peaks
+
+
+@numba.njit(fastmath=True, cache=True)
+def _local_maxima_1d(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Find local maxima in a 1D array.
+
+    Parameters
+    ----------
+    x : ndarray
+        The array to search for local maxima.
+
+    Returns
+    -------
+    midpoints : ndarray
+        Indices of midpoints of local maxima in `x`.
+    left_edges : ndarray
+        Indices of edges to the left of local maxima in `x`.
+    right_edges : ndarray
+        Indices of edges to the right of local maxima in `x`.
+    """
+    n = x.shape[0]
+    max_possible = n // 2
+
+    midpoints = np.empty(max_possible, dtype=np.intp)
+    left_edges = np.empty(max_possible, dtype=np.intp)
+    right_edges = np.empty(max_possible, dtype=np.intp)
+    m = 0  # Number of maxima found
+
+    i = 1
+    i_max = n - 1
+
+    while i < i_max:
+        if x[i - 1] < x[i]:
+            i_ahead = i + 1
+
+            while i_ahead < i_max and x[i_ahead] == x[i]:
+                i_ahead += 1
+
+            if x[i_ahead] < x[i]:
+                left_edges[m] = i
+                right_edges[m] = i_ahead - 1
+                midpoints[m] = (left_edges[m] + right_edges[m]) // 2
+                m += 1
+                i = i_ahead
+                continue  # Skip next increment since we already advanced
+        i += 1
+    return midpoints[:m], left_edges[:m], right_edges[:m]
 
 
 @numba.njit(fastmath=True, cache=True)

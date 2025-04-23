@@ -5,9 +5,9 @@ from __future__ import annotations
 import typing as ty
 
 import numpy as np
-from ims_utils.spectrum import ppm_diff
 
 from ims_utils.filters import PpmResampling
+from ims_utils.spectrum import ppm_diff
 
 
 class Object(ty.Protocol):

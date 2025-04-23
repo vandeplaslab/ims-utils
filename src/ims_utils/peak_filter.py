@@ -68,7 +68,9 @@ class PeakFilter:
             )
             self._indices_by_mz = filter_groups(groups, self.intensities)
             n = len(self.mzs) - len(self._indices_by_mz)
-        logger.info(f"[MZ] Found {len(self._indices_by_mz)} groups (reduction of {n}) in {timer()} (tol={mz_tol}; ppm={mz_ppm})")
+        logger.info(
+            f"[MZ] Found {len(self._indices_by_mz)} groups (reduction of {n}) in {timer()} (tol={mz_tol}; ppm={mz_ppm})"
+        )
         return self._indices_by_mz
 
     def filter_by_mz_merge(
@@ -88,7 +90,9 @@ class PeakFilter:
             )
             self._indices_by_mz_merge = filter_groups(groups, self.intensities)
             n = len(self.mzs) - len(self._indices_by_mz_merge)
-        logger.info(f"[MERGE] Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()} (tol={mz_tolerance}; ppm={mz_ppm})")
+        logger.info(
+            f"[MERGE] Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()} (tol={mz_tolerance}; ppm={mz_ppm})"
+        )
         return self._indices_by_mz_merge
 
     def filter_by_matrix(
@@ -100,10 +104,10 @@ class PeakFilter:
         **_kwargs: ty.Any,
     ) -> npt.NDArray:
         """Identify groups of centroids."""
-        from ims_utils.spectrum import ppm_error
         from koyo.utilities import find_nearest_index
 
         from ims_utils.assets import find_matrix
+        from ims_utils.spectrum import ppm_error
 
         assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
         if not any([mz_ppm, mz_tol]):
@@ -135,7 +139,9 @@ class PeakFilter:
             self._indices_by_matrix = np.setdiff1d(np.arange(len(self.mzs)), indices_to_remove)
             n_idx = len(self._indices_by_matrix)  # type: ignore[arg-type]
             n = len(self.mzs) - n_idx
-        logger.info(f"[MATRIX] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (matrix={matrix}; polarity={polarity}; tol={mz_tol}; ppm={mz_ppm})")
+        logger.info(
+            f"[MATRIX] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (matrix={matrix}; polarity={polarity}; tol={mz_tol}; ppm={mz_ppm})"
+        )
         return self._indices_by_matrix  # type: ignore[return-value]
 
     def filter_by_kendrick_mass(
@@ -151,7 +157,9 @@ class PeakFilter:
             self._indices_by_kendrick_mass = filtered.index.to_numpy()
             n_idx = len(self._indices_by_kendrick_mass)  # type: ignore[arg-type]
             n = len(self.mzs) - n_idx
-        logger.info(f"[KENDRICK] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (ref={ref}; filters={filters})")
+        logger.info(
+            f"[KENDRICK] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (ref={ref}; filters={filters})"
+        )
         return self._indices_by_kendrick_mass  # type: ignore[return-value]
 
     def filter_by_mass_defect(self, min_defect: float = 0.0, max_defect: float = 1.0, **_kwargs: ty.Any) -> npt.NDArray:
@@ -163,7 +171,9 @@ class PeakFilter:
             self._indices_by_mass_defect = np.arange(len(self.mzs))[~mask]
             n_idx = len(self._indices_by_mass_defect)  # type: ignore[arg-type]
             n = len(self.mzs) - n_idx
-        logger.info(f"[MASS DEFECT] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (min={min_defect}; max={max_defect})")
+        logger.info(
+            f"[MASS DEFECT] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (min={min_defect}; max={max_defect})"
+        )
         return self._indices_by_mass_defect  # type: ignore[return-value]
 
     @property
@@ -182,8 +192,9 @@ class PeakFilter:
 
     def find_index(self, mz: float) -> int:
         """Find index of a given m/z."""
-        from ims_utils.spectrum import ppm_error
         from koyo.utilities import find_nearest_index
+
+        from ims_utils.spectrum import ppm_error
 
         index = find_nearest_index(self.mzs, mz)
         mz_ = self.mzs[index]
@@ -235,8 +246,9 @@ class PeakFilter:
 
     def is_removed(self, mz: float) -> bool:
         """Check if centroid is removed."""
-        from ims_utils.spectrum import ppm_error
         from koyo.utilities import find_nearest_value
+
+        from ims_utils.spectrum import ppm_error
 
         found_mz = find_nearest_value(self.mzs, mz)
         ppm = abs(ppm_error(mz, found_mz))

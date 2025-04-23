@@ -3,6 +3,7 @@
 Majority of these filters had been taken from ms_peak_picker
 https://github.com/mobiusklein/ms_peak_picker/blob/master/ms_peak_picker/scan_filter.py
 """
+
 import typing as ty
 
 import numpy as np

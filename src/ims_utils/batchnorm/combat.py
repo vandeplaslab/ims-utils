@@ -51,7 +51,7 @@ def combat(
         Corrected array.
     """
     # only works on dense matrices so far
-    data = pd.DataFrame(data=array.A.T if issparse(array) else array.T)  # type: ignore
+    data = pd.DataFrame(data=array.toarray().T if issparse(array) else array.T)  # type: ignore
 
     # construct a pandas series of the batch annotation
     if isinstance(batches, np.ndarray):

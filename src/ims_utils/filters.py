@@ -4,6 +4,8 @@ Majority of these filters had been taken from ms_peak_picker
 https://github.com/mobiusklein/ms_peak_picker/blob/master/ms_peak_picker/scan_filter.py
 """
 
+from __future__ import annotations
+
 import typing as ty
 
 import numpy as np
@@ -53,11 +55,11 @@ class FilterBase:
         """Repr."""
         return f"Filter<{self.__class__.__name__}>"
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter array."""
         return mz_array, intensity_array
 
-    def __call__(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def __call__(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Call function."""
         return self.filter(mz_array, intensity_array)
 
@@ -66,7 +68,7 @@ class FilterBase:
 class MedianIntensityFilter(FilterBase):
     """Filter signal below the median signal."""
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         mask = intensity_array < np.median(intensity_array)
         intensity_array = np.array(intensity_array)
@@ -78,7 +80,7 @@ class MedianIntensityFilter(FilterBase):
 class MeanBelowMeanFilter(FilterBase):
     """Filter signal below the mean below the mean."""
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         mean = intensity_array.mean()
         mean_below_mean = (intensity_array < mean).mean()
@@ -107,7 +109,7 @@ class SavitskyGolayFilter(FilterBase):
         self.poly_order = poly_order
         self.deriv = deriv
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from scipy.signal import savgol_filter
 
@@ -128,7 +130,7 @@ class GaussianSmoothFilter(FilterBase):
     def __init__(self, width=0.02):
         self.width = width
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from scipy.ndimage import gaussian_filter
 
@@ -143,7 +145,7 @@ class MovingAverageFilter(FilterBase):
     def __init__(self, size=20):
         self.size = size
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from scipy.ndimage import uniform_filter1d
 
@@ -159,7 +161,7 @@ class NPercentOfMaxFilter(FilterBase):
     def __init__(self, p=0.001):
         self.p = p
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         mask = (intensity_array / np.max(intensity_array)) < self.p
         intensity_array_clone = np.array(intensity_array)
@@ -173,7 +175,7 @@ class ConstantThreshold(FilterBase):
     def __init__(self, constant):
         self.constant = constant
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         mask = intensity_array < self.constant
         intensity_array = intensity_array.copy()
@@ -187,7 +189,7 @@ class MaximumScaler(FilterBase):
     def __init__(self, threshold: float):
         self.threshold = threshold
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         if np.max(intensity_array) > self.threshold:
             intensity_array = intensity_array / np.max(intensity_array) * self.threshold
@@ -200,7 +202,7 @@ class IntensityScaler(FilterBase):
     def __init__(self, scale):
         self.scale = scale
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         intensity_array = intensity_array * self.scale
         return mz_array, intensity_array
@@ -215,7 +217,7 @@ class LinearResampling(FilterBase):
         self.mz_start = mz_start
         self.mz_end = mz_end
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         if self.mz_start is None:
             self.mz_start = np.min(mz_array)
@@ -242,12 +244,27 @@ class PpmResampling(FilterBase):
         self.mz_end = float(mz_end)
         self.mz_new = get_ppm_axis(self.mz_start, self.mz_end, self.ppm)
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
-        # from scipy.interpolate import interp1d
         return self.mz_new, np.interp(self.mz_new, mz_array, intensity_array)
-        # func = interp1d(mz_array, intensity_array, fill_value=0, bounds_error=False)
-        # return self.mz_new, func(self.mz_new)
+
+
+class MzResampling(FilterBase):
+    """Resample spectrum to specified m/z values."""
+
+    def __init__(self, mz: np.ndarray):
+        self.mz = mz
+        self.mz_start = np.min(mz)
+        self.mz_end = np.max(mz)
+
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Filter."""
+        # crop array so that it fits the mass range - only if the mass range is actually too large
+        if self.mz_start < mz_array[0] or self.mz_end > mz_array[-1]:
+            start_idx, end_idx = find_nearest_index(mz_array, [self.mz_start, self.mz_end])
+            mz_array = mz_array[start_idx:end_idx]
+            intensity_array = intensity_array[start_idx:end_idx]
+        return self.mz, np.interp(self.mz, mz_array, intensity_array)
 
 
 class Crop(FilterBase):
@@ -257,7 +274,7 @@ class Crop(FilterBase):
         self.mz_start = mz_start
         self.mz_end = mz_end
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         start_idx, end_idx = find_nearest_index(mz_array, [self.mz_start, self.mz_end])
         return mz_array[start_idx:end_idx], intensity_array[start_idx:end_idx]
@@ -270,7 +287,7 @@ class BaselineALS(FilterBase):
         self.lam = lam
         self.p = p
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from ims_utils.baseline import als
 
@@ -286,7 +303,7 @@ class BaselineModifiedALS(FilterBase):
         self.p = p
         self.n_iter = n_iter
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from ims_utils.baseline import arpls
 
@@ -302,7 +319,7 @@ class BaselinePolynomial(FilterBase):
     def __init__(self, order: int):
         self.order = order
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from ims_utils._vendored.peakutils import baseline
 
@@ -316,7 +333,7 @@ class ConstantRecalibrate(FilterBase):
     def __init__(self, offset: float):
         self.offset = offset
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         return mz_array + self.offset, intensity_array
 
@@ -327,7 +344,7 @@ class IndexRecalibrate(FilterBase):
     def __init__(self, shift: int):
         self.shift = shift
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from msalign.utilities import shift
 
@@ -353,25 +370,11 @@ class PpmRecalibrate(FilterBase):
         self.ppm = ppm
         self.every_n = every_n
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from ims_utils.spectrum import get_ppm_offsets
 
         return mz_array - get_ppm_offsets(mz_array, self.ppm, every_n=self.every_n), intensity_array
-
-
-class MzResampling(FilterBase):
-    """Resample spectrum to specified number of points."""
-
-    def __init__(self, mz: np.ndarray):
-        self.mz = mz
-
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
-        """Filter."""
-        # from scipy.interpolate import interp1d
-        return self.mz, np.interp(self.mz, mz_array, intensity_array)
-        # func = interp1d(mz_array, intensity_array, fill_value=0, bounds_error=False)
-        # return self.mz, func(self.mz)
 
 
 class PpmPeakRecalibrate(FilterBase):
@@ -380,7 +383,7 @@ class PpmPeakRecalibrate(FilterBase):
     def __init__(self, ppm: float):
         self.ppm = ppm
 
-    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> ty.Tuple[np.ndarray, np.ndarray]:
+    def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
         from ims_utils.spectrum import get_window_for_ppm
 
@@ -389,8 +392,8 @@ class PpmPeakRecalibrate(FilterBase):
 
 
 def transform(
-    mz_array: np.ndarray, intensity_array: np.ndarray, filters: ty.Optional[ty.Iterable[str]] = None
-) -> ty.Tuple[np.ndarray, np.ndarray]:
+    mz_array: np.ndarray, intensity_array: np.ndarray, filters: ty.Iterable[str] | None = None
+) -> tuple[np.ndarray, np.ndarray]:
     """Apply a series of *filters* to the paired m/z and intensity arrays.
 
     The `filters` argument should be an iterable of either strings,

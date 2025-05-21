@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from ims_utils.resample import get_resampler_from_mzs
+from ims_utils.resample import get_resampler_from_mz, get_resampler_from_mzs
 
 
-def test_resampler():
+def test_resampler_multiple():
     mz_xs = [np.arange(1, 100), np.arange(1, 120)]
     resampler = get_resampler_from_mzs(mz_xs)
     assert resampler is not None, "resampler is None"
@@ -15,6 +15,33 @@ def test_resampler():
 
     new_xs = np.arange(1, 51)
     new_ys = np.random.randint(0, 100, 50)
+    resampled_xs, resampled_ys = resampler(new_xs, new_ys)
+    assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
+    assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"
+
+
+def test_resampler_single():
+    mz_xs = [np.arange(1, 100), np.arange(1, 120)]
+    resampler = get_resampler_from_mz(mz_xs[0])
+    assert resampler is not None, "resampler is None"
+    assert resampler.mz_start == 1.0, "mz_min is not 0.0"
+    assert resampler.mz_end == 99.0, "mz_max is not 100.0"
+    assert resampler.mz is not None, "mz_new is None"
+
+    new_xs = np.arange(1, 51)
+    new_ys = np.random.randint(0, 100, new_xs.size)
+    resampled_xs, resampled_ys = resampler(new_xs, new_ys)
+    assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
+    assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"
+
+    new_xs = np.arange(1, 151)
+    new_ys = np.random.randint(0, 100, new_xs.size)
+    resampled_xs, resampled_ys = resampler(new_xs, new_ys)
+    assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
+    assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"
+
+    new_xs = np.arange(11, 151)
+    new_ys = np.random.randint(0, 100, new_xs.size)
     resampled_xs, resampled_ys = resampler(new_xs, new_ys)
     assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
     assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"

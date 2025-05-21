@@ -6,7 +6,7 @@ import typing as ty
 
 import numpy as np
 
-from ims_utils.filters import PpmResampling
+from ims_utils.filters import MzResampling, PpmResampling
 from ims_utils.spectrum import ppm_diff
 
 
@@ -48,6 +48,12 @@ def get_resampler_from_mzs(mz_xs: ty.Iterable[np.ndarray]) -> PpmResampling:
     ppm_spacing = _get_spacing(mz_xs)
     mz_min, mz_max = _get_mass_range(mz_xs)
     return PpmResampling(ppm_spacing, mz_min, mz_max)
+
+
+def get_resampler_from_mz(mz_x: np.ndarray) -> MzResampling:
+    """Get resampler."""
+    # we need to convert to list so can be indexed, and we need to be able to iterate twice
+    return MzResampling(mz_x)
 
 
 def get_resampler(readers: ty.Iterable[Object]) -> PpmResampling:

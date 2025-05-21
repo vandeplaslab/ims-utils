@@ -74,24 +74,22 @@ class PeakFilter:
         return self._indices_by_mz
 
     def filter_by_mz_merge(
-        self, mz_tolerance: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
+        self, mz_tol: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> npt.NDArray:
         """Filter by m/z values."""
         from ims_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
-        assert mz_tolerance is not None and mz_tolerance > 0, "M/z tolerance must be greater than 0"
+        assert mz_tol is not None and mz_tol > 0, "M/z tolerance must be greater than 0"
         assert max_in_group is not None and max_in_group > 0, "Max in group must be greater than 0"
-        if not any([mz_ppm, mz_tolerance]):
-            raise ValueError("Either `mz_ppm` or `mz_tolerance` must be specified")
+        if not any([mz_ppm, mz_tol]):
+            raise ValueError("Either `mz_ppm` or `mz_tol` must be specified")
         with MeasureTimer() as timer:
-            groups = find_groups_within_bounds(
-                self.mzs, tolerance=mz_tolerance, ppm=mz_ppm, keep_singletons=True, distance=0
-            )
+            groups = find_groups_within_bounds(self.mzs, tolerance=mz_tol, ppm=mz_ppm, keep_singletons=True, distance=0)
             self._indices_by_mz_merge = filter_groups(groups, self.intensities)
             n = len(self.mzs) - len(self._indices_by_mz_merge)
         logger.info(
-            f"[MERGE] Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()} (tol={mz_tolerance}; ppm={mz_ppm})"
+            f"[MERGE] Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()} (tol={mz_tol}; ppm={mz_ppm})"
         )
         return self._indices_by_mz_merge
 

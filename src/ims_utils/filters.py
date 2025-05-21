@@ -252,10 +252,12 @@ class PpmResampling(FilterBase):
 class MzResampling(FilterBase):
     """Resample spectrum to specified m/z values."""
 
-    def __init__(self, mz: np.ndarray):
+    def __init__(self, mz: np.ndarray, original_scale: bool = False, original_dtype: bool = False):
         self.mz = mz
         self.mz_start = np.min(mz)
         self.mz_end = np.max(mz)
+        self.original_scale = original_scale
+        self.original_dtype = original_dtype
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Filter."""
@@ -264,7 +266,25 @@ class MzResampling(FilterBase):
             start_idx, end_idx = find_nearest_index(mz_array, [self.mz_start, self.mz_end])
             mz_array = mz_array[start_idx:end_idx]
             intensity_array = intensity_array[start_idx:end_idx]
-        return self.mz, np.interp(self.mz, mz_array, intensity_array)
+        y_max = intensity_array.max()
+        dtype = intensity_array.dtype
+        intensity_array = np.interp(self.mz, mz_array, intensity_array)
+        if self.original_scale:
+            intensity_array = intensity_array / intensity_array.max() * y_max
+        if self.original_dtype:
+            intensity_array = retype(intensity_array, dtype)
+        return self.mz, intensity_array
+
+
+def retype(array: np.ndarray, dtype: np.dtype) -> np.ndarray:
+    """Retype while taking into account rounding issue."""
+    current_dtype = array.dtype
+    if current_dtype != dtype:
+        if np.issubdtype(dtype, np.integer):
+            array = np.round(array).astype(dtype)
+        else:
+            array = array.astype(dtype)
+    return array
 
 
 class Crop(FilterBase):

@@ -50,10 +50,10 @@ def get_resampler_from_mzs(mz_xs: ty.Iterable[np.ndarray]) -> PpmResampling:
     return PpmResampling(ppm_spacing, mz_min, mz_max)
 
 
-def get_resampler_from_mz(mz_x: np.ndarray) -> MzResampling:
+def get_resampler_from_mz(mz_x: np.ndarray, original_scale: bool = False, original_dtype: bool = False) -> MzResampling:
     """Get resampler."""
     # we need to convert to list so can be indexed, and we need to be able to iterate twice
-    return MzResampling(mz_x)
+    return MzResampling(mz_x, original_scale, original_dtype)
 
 
 def get_resampler(readers: ty.Iterable[Object]) -> PpmResampling:

@@ -1,4 +1,5 @@
 """Baseline."""
+
 import math
 import typing as ty
 

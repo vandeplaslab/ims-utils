@@ -1,4 +1,5 @@
 """Spectrum utilities."""
+
 from importlib.metadata import PackageNotFoundError, version
 
 try:

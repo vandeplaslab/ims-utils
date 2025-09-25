@@ -20,10 +20,10 @@ from scipy.stats import mode, scoreatpercentile
 
 
 def mexican_hat(points, a):
-    A = 2 / (np.sqrt(3 * a) * (np.pi ** 0.25))
-    wsq = a ** 2
+    A = 2 / (np.sqrt(3 * a) * (np.pi**0.25))
+    wsq = a**2
     vec = np.arange(0, points) - (points - 1.0) / 2
-    tsq = vec ** 2
+    tsq = vec**2
     mod = 1 - tsq / wsq
     gauss = np.exp(-tsq / (2 * wsq))
     total = A * mod * gauss

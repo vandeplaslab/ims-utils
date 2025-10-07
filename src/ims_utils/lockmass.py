@@ -35,11 +35,11 @@ class LockmassEstimator:
             Window size for lockmass peak detection.
         """
         self.mz_x = mz_x
-        self.peaks = peaks
-        self.n_peaks = len(peaks)
+        self.peaks = np.sort(peaks)
+        self.n_peaks = len(self.peaks)
         self.window = window
 
-        self.mz_indices, self.peak_indices, self.masks = _prepare_lockmass(mz_x, peaks, window)
+        self.mz_indices, self.peak_indices, self.masks = _prepare_lockmass(mz_x, self.peaks, window)
         self.centroid_func = fast_parabolic_centroid
 
     def __call__(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
@@ -100,8 +100,10 @@ class LockmassEstimator:
         weighted: bool
             Whether to use weighted distance for peak selection.
         """
-        if not isinstance(reader, BaseReader):
-            raise ValueError("reader must be an instance of BaseReader")
+        if not hasattr(reader, "n_pixels"):
+            raise ValueError("reader must have n_pixels attribute")
+        if not hasattr(reader, "spectra_iter"):
+            raise ValueError("reader must have spectra_iter attribute")
         n_spectra = reader.n_pixels
         shifts = np.zeros((n_spectra, self.n_peaks), dtype=np.float32)
         for i, (_mz_x, mz_y) in enumerate(reader.spectra_iter(silent=False)):

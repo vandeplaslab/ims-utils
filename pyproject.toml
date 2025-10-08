@@ -179,7 +179,8 @@ ignore = [
     ".ruff_cache/**/*",
     "tests/**/*",
     ".idea/**/*",
-    "_version.py"
+    "_version.py",
+    "*venv/**/*",
 ]
 
 # # for things that require compilation

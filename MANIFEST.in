@@ -12,6 +12,7 @@ include LICENSE
 recursive-include tests *
 recursive-include src *.typed
 recursive-include src *.csv
+recursive-exclude examples *.ipynb
 
 # Always include
 global-include *.pyx

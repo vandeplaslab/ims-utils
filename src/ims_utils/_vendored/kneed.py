@@ -259,7 +259,6 @@ class KneeLocator:
         Plots the normalized curve, the distance curve (x_distance, y_normalized) and the
         knee, if it exists.
         """
-
         fig, ax = plt.subplots(figsize=(8, 8))
         plt.plot(self.x_normalized, self.y_normalized)
         plt.plot(self.x_difference, self.y_difference, "r")
@@ -270,7 +269,6 @@ class KneeLocator:
 
     def plot_knee(self) -> plt.Figure:
         """Plot the curve and the knee, if it exists."""
-
         fig, ax = plt.subplots(figsize=(8, 8))
         ax.plot(self.x, self.y)
         ax.vlines(self.knee, plt.ylim()[0], plt.ylim()[1])

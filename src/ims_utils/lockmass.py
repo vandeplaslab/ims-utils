@@ -9,10 +9,11 @@ from koyo.utilities import find_nearest_index, get_array_mask
 
 from ims_utils.spectrum import fast_parabolic_centroid
 
-try:
-    from imzy import BaseReader  # type: ignore[import]
-except ImportError:  # pragma: no cover
-    BaseReader = None  # type: ignore[assignment]
+if ty.TYPE_CHECKING:
+    try:
+        from imzy import BaseReader  # type: ignore[import]
+    except ImportError:  # pragma: no cover
+        BaseReader = None  # type: ignore[assignment]
 
 
 # Intensity threshold for lockmass detection

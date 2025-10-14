@@ -23,7 +23,7 @@ LOCKMASS_THRESHOLD: float = 500
 class LockmassEstimator:
     """Lockmass estimator class."""
 
-    def __init__(self, mz_x: np.ndarray, peaks: np.ndarray, window: float = 0.1):
+    def __init__(self, mz_x: np.ndarray, peaks: np.ndarray):
         """Initialize lockmass estimator.
 
         Parameters
@@ -32,18 +32,13 @@ class LockmassEstimator:
             Mass values of the spectrum. This should be a profile mass spectrum.
         peaks: np.ndarray
             List of lockmass peaks to use for estimation.
-        window: float
-            Window size for lockmass peak detection.
         """
         self.mz_x = mz_x
         self.peaks = np.sort(peaks)
         self.n_peaks = len(self.peaks)
-        self.window = window
 
-        self.mz_indices, self.peak_indices, self.masks = _prepare_lockmass(mz_x, self.peaks, window)
-        self.centroid_func = fast_parabolic_centroid
 
-    def __call__(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
+    def __call__(self, mz_y: np.ndarray,  **kwargs: ty.Any) -> np.ndarray:
         """Estimate lockmass shifts for the given spectrum.
 
         Parameters
@@ -51,14 +46,10 @@ class LockmassEstimator:
         mz_y : np.ndarray
             Intensity values of the spectrum. This should be a profile mass spectrum with the same number
             of m/z values as used during initialization.
-        weighted: bool
-            Whether to use weighted distance for peak selection.
-        out: np.ndarray | None
-            Output array to store the results. If None, a new array will be created.
         """
-        return self.estimate(mz_y, weighted, out)
+        return self.estimate(mz_y, **kwargs)
 
-    def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
+    def estimate(self, mz_y: np.ndarray, **kwargs: ty.Any) -> np.ndarray:
         """Estimate lockmass shifts for the given spectrum.
 
         Parameters
@@ -66,15 +57,8 @@ class LockmassEstimator:
         mz_y : np.ndarray
             Intensity values of the spectrum. This should be a profile mass spectrum with the same number
             of m/z values as used during initialization.
-        weighted: bool
-            Whether to use weighted distance for peak selection.
-        out: np.ndarray | None
-            Output array to store the results. If None, a new array will be created.
         """
-        out = np.zeros(self.n_peaks, dtype=np.float32) if out is None else out
-        return _estimate_lockmass_shifts(
-            mz_y, self.centroid_func, self.mz_indices, self.peak_indices, self.masks, weighted, out
-        )
+        raise NotImplementedError("Must implement method")
 
     @staticmethod
     def apply(mz_y: np.ndarray, shift: int) -> np.ndarray:
@@ -112,6 +96,85 @@ class LockmassEstimator:
         return shifts
 
 
+class MaximumIntensityLockmassEstimator(LockmassEstimator):
+    """Maximum intensity lockmass estimator."""
+
+    def __init__(self, mz_x: np.ndarray, peaks: np.ndarray, window: float = 0.1):
+        """Initialize lockmass estimator.
+
+        Parameters
+        ----------
+        mz_x: np.ndarray
+            Mass values of the spectrum. This should be a profile mass spectrum.
+        peaks: np.ndarray
+            List of lockmass peaks to use for estimation.
+        window: float
+            Window size for lockmass peak detection.
+        """
+        super().__init__(mz_x, peaks)
+        self.window = window
+
+        self.mz_indices, self.peak_indices, self.masks = _prepare_lockmass(mz_x, self.peaks, window)
+
+    def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
+        """Estimate lockmass shifts for the given spectrum.
+
+        Parameters
+        ----------
+        mz_y : np.ndarray
+            Intensity values of the spectrum. This should be a profile mass spectrum with the same number
+            of m/z values as used during initialization.
+        weighted: bool
+            Whether to use weighted distance for peak selection.
+        out: np.ndarray | None
+            Output array to store the results. If None, a new array will be created.
+        """
+        out = np.zeros(self.n_peaks, dtype=np.float32) if out is None else out
+        return _estimate_lockmass_maximum(
+            mz_y, self.masks, out
+        )
+    
+class WeightedIntensityLockmassEstimator(LockmassEstimator):
+    """Weighted intensity lockmass estimator."""
+    
+    
+    def __init__(self, mz_x: np.ndarray, peaks: np.ndarray, window: float = 0.1):
+        """Initialize lockmass estimator.
+
+        Parameters
+        ----------
+        mz_x: np.ndarray
+            Mass values of the spectrum. This should be a profile mass spectrum.
+        peaks: np.ndarray
+            List of lockmass peaks to use for estimation.
+        window: float
+            Window size for lockmass peak detection.
+        """
+        super().__init__(mz_x, peaks)
+        self.window = window
+
+        self.mz_indices, self.peak_indices, self.masks = _prepare_lockmass(mz_x, self.peaks, window)
+        self.centroid_func = fast_parabolic_centroid
+    
+    def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
+        """Estimate lockmass shifts for the given spectrum.
+
+        Parameters
+        ----------
+        mz_y : np.ndarray
+            Intensity values of the spectrum. This should be a profile mass spectrum with the same number
+            of m/z values as used during initialization.
+        weighted: bool
+            Whether to use weighted distance for peak selection.
+        out: np.ndarray | None
+            Output array to store the results. If None, a new array will be created.
+        """
+        out = np.zeros(self.n_peaks, dtype=np.float32) if out is None else out
+        return _estimate_lockmass_shifts(
+            mz_y, self.centroid_func, self.mz_indices, self.peak_indices, self.masks, weighted, out
+        )
+
+
 def _prepare_lockmass(
     x: np.ndarray, peaks: ty.Iterable[float], window: float = 0.1
 ) -> tuple[np.ndarray, np.ndarray, dict[float, np.ndarray]]:
@@ -120,6 +183,18 @@ def _prepare_lockmass(
     peak_indices = find_nearest_index(x, peaks)
     masks = {peak: get_array_mask(x, peak - window, peak + window) for peak in peaks}
     return mz_indices, peak_indices, masks
+
+
+def _estimate_lockmass_maximum(
+    mz_y: np.ndarray,
+    masks: dict,
+    out: np.ndarray | None = None,
+) -> np.ndarray:
+    """Estimate lockmass shifts using maximum intensity."""
+    out = np.zeros(len(masks), dtype=np.float32) if out is None else out
+    for j, (_peak, mask) in enumerate(masks.items()):
+        out[j] = np.argmax(mz_y[mask])
+    return out
 
 
 def _estimate_lockmass_shifts(

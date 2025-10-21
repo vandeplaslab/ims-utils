@@ -36,26 +36,47 @@ def show_html(filename: PathLike) -> None:
     webbrowser.open(filename.as_uri())
 
 
-def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:
-    """Export Plotly mass spectrum as HTML document."""
+def make_plot(x: np.ndarray, y: np.ndarray, name: str, x_label: str = "", y_label: str = "", title: str = "") -> go.Figure:
+    """Export Plotly line plot as HTML document."""
     import plotly.graph_objects as go
 
     # Create a figure
     fig = go.Figure()
 
     # Add the mass spectrum line
-    fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
+    fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name))
 
     # Update layout
     fig.update_layout(
-        title="Mass Spectrum",
-        xaxis_title="m/z",
-        yaxis_title="Intensity",
+        title=title,
+        xaxis_title=x_label,
+        yaxis_title=y_label,
         template="simple_white",
         width=1200,  # Adjust width here
         height=800,  # Adjust height here
     )
     return fig
+
+
+def add_scatter(fig: go.Figure, x: np.ndarray, y: np.ndarray, name: str = "scatter", color: str = "blue") -> go.Figure:
+    """Add scatter plot."""
+    import plotly.graph_objects as go
+
+    fig.add_trace(go.Scatter(x=x, y=y, mode="markers", name=name, line={"color": color}))
+    return fig
+
+
+def add_line(fig: go.Figure, x: np.ndarray, y: np.ndarray, name: str = "line", color: str = "blue") -> go.Figure:
+    """Add line plot."""
+    import plotly.graph_objects as go
+
+    fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name, line={"color": color}))
+    return fig
+
+
+def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:
+    """Export Plotly mass spectrum as HTML document."""
+    return make_plot(mz_x, mz_y, name, x_label="m/z", y_label="Intensity", title="Mass Spectrum")
 
 
 def make_peaks_spectrum(

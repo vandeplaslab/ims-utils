@@ -58,11 +58,11 @@ def make_plot(x: np.ndarray, y: np.ndarray, name: str, x_label: str = "", y_labe
     return fig
 
 
-def add_scatter(fig: go.Figure, x: np.ndarray, y: np.ndarray, name: str = "scatter", color: str = "blue") -> go.Figure:
+def add_scatter(fig: go.Figure, x: np.ndarray, y: np.ndarray, name: str = "scatter", color: str = "blue", visible: bool = True) -> go.Figure:
     """Add scatter plot."""
     import plotly.graph_objects as go
 
-    fig.add_trace(go.Scatter(x=x, y=y, mode="markers", name=name, line={"color": color}))
+    fig.add_trace(go.Scatter(x=x, y=y, mode="markers", name=name, line={"color": color}, visible=True if visible else "legendonly"))
     return fig
 
 

@@ -44,6 +44,291 @@ def centwave_estimate_noise(y: np.ndarray, ys: np.ndarray) -> np.ndarray:
     return (ys - bl) / nl
 
 
+
+def local_estimate_noise(
+    mz: np.ndarray,
+    intens: np.ndarray,
+    peaks: ty.Union[ty.Sequence[int], ty.Sequence[float]],
+    *,
+    peaks_kind: ty.Literal["index", "mz"] = "index",
+    window_ppm: float = 50.0,
+    window_da: float = None,
+    core_ppm: float = 5.0,
+    core_da: float = None,
+    min_points: int = 25,
+    clip_nonpositive_noise: float = 1e-12,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Estimate SNR for peaks in a mass spectrum using robust local baseline & noise.
+
+    Parameters
+    ----------
+    mz : (N,) array
+        Monotonic m/z axis (profile or centroid grid).
+    intens : (N,) array
+        Intensities aligned with `mz`.
+    peaks : sequence of ints or floats
+        Peak locations. If peaks_kind="index", they are indices into the arrays.
+        If peaks_kind="mz", they are target m/z values (nearest index is used).
+    peaks_kind : {'index','mz'}
+        How to interpret `peaks`.
+    window_ppm, window_da :
+        Half-width of the *background* window around each peak. Use ppm (instrument-aware)
+        or absolute Da (if provided). If both provided, the **max** of the two is used.
+    core_ppm, core_da :
+        Half-width of the *core* exclusion zone centered on the peak that is removed
+        from the background window before estimating baseline/noise. Again, max of ppm/Da.
+        Typical defaults: core_ppm ~ 3–10 ppm for high-res; core_da ~ 0.001–0.01 Da.
+    min_points : int
+        Minimum number of points required in the background set; if fewer, the window is
+        expanded 1.5× iteratively until satisfied (bounded by spectrum edges).
+    clip_nonpositive_noise : float
+        Floor to avoid division by zero.
+
+    Returns
+    -------
+    snr : (K,) array
+        SNR for each input peak.
+    baseline : (K,) array
+        Estimated local baseline (median of background).
+    noise_sigma : (K,) array
+        Robust noise sigma estimate = 1.4826 * MAD(background - baseline).
+
+    Notes
+    -----
+    - Background is the set of samples within `window` but **outside** the `core`.
+    - Peak "height" is the intensity at the peak index (no sub-bin refinement here).
+    - For centroided data with sparse points, you can increase `window_ppm` so the
+      background includes enough samples.
+    """
+    mz = np.asarray(mz, dtype=float)
+    y = np.asarray(intens, dtype=float)
+    n = mz.size
+    if y.size != n:
+        raise ValueError("mz and intens must have the same length.")
+
+    # Resolve peak indices
+    if peaks_kind == "index":
+        idx = np.asarray(peaks, dtype=int)
+        if np.any((idx < 0) | (idx >= n)):
+            raise ValueError("Some peak indices are out of range.")
+    elif peaks_kind == "mz":
+        pmz = np.asarray(peaks, dtype=float)
+        # nearest neighbor indices via searchsorted
+        idx = np.clip(np.searchsorted(mz, pmz), 0, n-1)
+        # choose closer neighbor if we're on the right side
+        right = idx < n-1
+        choose_left = right & (np.abs(pmz[right] - mz[idx[right]]) > np.abs(pmz[right] - mz[idx[right]-1]))
+        idx[right][choose_left] -= 1
+    else:
+        raise ValueError("peaks_kind must be 'index' or 'mz'.")
+
+    # Helpers to turn ppm/Da into absolute Da windows at a given mz
+    def _halfwidth_da(m0: float, ppm: float, da: float) -> float:
+        w_ppm = m0 * ppm * 1e-6 if ppm is not None else 0.0
+        w_da = da if da is not None else 0.0
+        return max(w_ppm, w_da, 0.0)
+
+    snr = np.empty(idx.size, dtype=float)
+    baseline = np.empty(idx.size, dtype=float)
+    noise_sig = np.empty(idx.size, dtype=float)
+
+    for k, i in enumerate(idx):
+        m0 = mz[i]
+
+        # Determine window and core half-widths in Da
+        w_da = _halfwidth_da(m0, window_ppm, window_da)
+        c_da = _halfwidth_da(m0, core_ppm, core_da)
+
+        # Ensure the core is not larger than the window
+        if c_da >= w_da:
+            # fall back to a smaller core (e.g., 1/3 of window)
+            c_da = 0.33 * w_da
+
+        # Convert Da to index ranges using searchsorted
+        def range_idx(da_half: float):
+            lo = m0 - da_half
+            hi = m0 + da_half
+            a = np.searchsorted(mz, lo, side="left")
+            b = np.searchsorted(mz, hi, side="right")
+            return max(0, a), min(n, b)
+
+        a_w, b_w = range_idx(w_da)
+        a_c, b_c = range_idx(c_da)
+
+        # Background = window minus core slice
+        # Concatenate left and right sides (avoid copying huge arrays by views)
+        # If too few points, scale window until enough or edges hit
+        scale = 1.0
+        bg = None
+        while True:
+            if scale != 1.0:
+                a_w, b_w = range_idx(scale * w_da)
+                a_c, b_c = range_idx(scale * c_da * 0.8)  # keep core smaller than window
+            left_bg = y[a_w:max(a_c, a_w)]
+            right_bg = y[min(b_c, b_w):b_w]
+            if left_bg.size + right_bg.size >= min_points or (a_w == 0 and b_w == n):
+                bg = (left_bg, right_bg)
+                break
+            scale *= 1.5
+            if scale > 20:  # safety
+                bg = (left_bg, right_bg)
+                break
+
+        # Robust baseline & noise from background
+        if left_bg.size + right_bg.size == 0:
+            # Degenerate case: no background, fall back to global estimates
+            med = np.median(y)
+            mad = np.median(np.abs(y - med))
+        else:
+            # Use medians without concatenating to save memory
+            comb = np.concatenate(bg) if left_bg.size and right_bg.size else (left_bg if left_bg.size else right_bg)
+            med = np.median(comb)
+            mad = np.median(np.abs(comb - med))
+
+        sigma = 1.4826 * mad
+        sigma = max(sigma, clip_nonpositive_noise)
+
+        baseline[k] = med
+        noise_sig[k] = sigma
+        snr[k] = (y[i] - med) / sigma
+    return snr, baseline, noise_sig
+
+
+
+def estimate_peak_prominence(
+    intensities: np.ndarray,
+    peaks: ty.Union[ty.Sequence[int], np.ndarray],
+    *,
+    smooth_median_width: int = 0,
+) -> ty.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute peak prominence for a 1D signal (mass spectrum).
+
+    Parameters
+    ----------
+    intensities : (N,) array
+        Intensities (profile or centroid-grid). Values should be non-negative.
+    peaks : sequence of int
+        Indices of peaks (e.g., from your peak picker, local maxima).
+    smooth_median_width : int, default 0
+        Optional simple denoising: if >0, apply a running median of this width
+        *only* for determining valley minima (the returned prominences are still
+        referenced to original intensities). Use an odd integer (e.g., 5–21).
+
+    Returns
+    -------
+    prominence : (K,) array
+        Prominence of each peak.
+    left_base : (K,) array of int
+        Index of the left base (valley) used for the prominence contour.
+    right_base : (K,) array of int
+        Index of the right base (valley) used for the prominence contour.
+
+    Notes
+    -----
+    - This mirrors the standard definition used in signal processing libraries.
+    - Complexity is O(K log K + K * avg_valley_span); fast in practice since K << N.
+    - If a peak has no higher neighbor on one side, that side’s valley search extends
+      to the array edge.
+    """
+    y = np.asarray(intensities, dtype=float)
+    n = y.size
+    peaks = np.asarray(peaks, dtype=int)
+    if peaks.size == 0:
+        return np.array([]), np.array([], dtype=int), np.array([], dtype=int)
+    if np.any(peaks < 0) or np.any(peaks >= n):
+        raise ValueError("Some peak indices are out of range.")
+
+    # Optional mild smoothing (for valley-finding only)
+    if smooth_median_width and smooth_median_width > 1:
+        k = int(smooth_median_width)
+        k = k if k % 2 == 1 else k + 1
+        pad = k // 2
+        pad_left = y[0] * np.ones(pad)
+        pad_right = y[-1] * np.ones(pad)
+        yp = np.concatenate([pad_left, y, pad_right])
+        # running median via sliding window (simple but OK for valley-finding)
+        ys = np.empty_like(y)
+        for i in range(n):
+            ys[i] = np.median(yp[i:i + 2*pad + 1])
+        y_valley = ys
+    else:
+        y_valley = y  # use raw for valley search
+
+    # Sort peaks by index
+    order = np.argsort(peaks)
+    p_idx = peaks[order]
+    p_h = y[p_idx]
+
+    # Nearest higher peak to LEFT and RIGHT among the given peaks
+    # Standard "nearest greater element" using stacks.
+    left_higher = np.full(p_idx.size, -1, dtype=int)
+    stack = []  # will store indices into p_idx (monotone decreasing heights)
+    for j in range(p_idx.size):
+        h = p_h[j]
+        # Maintain stack of strictly greater heights
+        while stack and p_h[stack[-1]] <= h:
+            stack.pop()
+        left_higher[j] = stack[-1] if stack else -1
+        stack.append(j)
+
+    right_higher = np.full(p_idx.size, -1, dtype=int)
+    stack = []
+    for j in range(p_idx.size - 1, -1, -1):
+        h = p_h[j]
+        while stack and p_h[stack[-1]] <= h:
+            stack.pop()
+        right_higher[j] = stack[-1] if stack else -1
+        stack.append(j)
+
+    # For each peak, define the search bounds to the left/right
+    left_base = np.empty(p_idx.size, dtype=int)
+    right_base = np.empty(p_idx.size, dtype=int)
+    prominence = np.empty(p_idx.size, dtype=float)
+
+    for j in range(p_idx.size):
+        i = p_idx[j]
+        # Left bound: index after the nearest higher peak on the left (or start of signal)
+        if left_higher[j] == -1:
+            left_bound = 0
+        else:
+            left_bound = p_idx[left_higher[j]]
+        # Right bound: index before the nearest higher peak on the right (or end of signal)
+        if right_higher[j] == -1:
+            right_bound = n - 1
+        else:
+            right_bound = p_idx[right_higher[j]]
+
+        # Left valley: minimum between (left_bound .. i)
+        if i > left_bound:
+            lb_slice = slice(left_bound, i)
+            il = left_bound + int(np.argmin(y_valley[lb_slice]))
+        else:
+            il = i
+        # Right valley: minimum between (i .. right_bound)
+        if right_bound > i:
+            rb_slice = slice(i, right_bound + 1)
+            ir = i + int(np.argmin(y_valley[rb_slice]))
+        else:
+            ir = i
+
+        # Contour level is the higher of the two valleys
+        base_level = max(y_valley[il], y_valley[ir])
+        prom = y[i] - base_level
+        if prom < 0:
+            prom = 0.0  # guard tiny negatives due to noise/smoothing differences
+
+        left_base[j] = il
+        right_base[j] = ir
+        prominence[j] = prom
+
+    # Return in the same order as input peaks
+    inv = np.empty_like(order)
+    inv[order] = np.arange(order.size)
+    return prominence[inv], left_base[inv], right_base[inv]
+
+
 def oms_centroid(
     mzs: np.ndarray,
     intensities: np.ndarray,

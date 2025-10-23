@@ -114,7 +114,7 @@ class MaximumIntensityLockmassEstimator(LockmassEstimator):
         super().__init__(mz_x, peaks)
         self.window = window
 
-        self.mz_indices, self.peak_indices, self.masks = _prepare_lockmass(mz_x, self.peaks, window)
+        self.mz_indices, self.peak_indices, self.masks, self.offsets = _prepare_lockmass(mz_x, self.peaks, window)
 
     def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
         """Estimate lockmass shifts for the given spectrum.
@@ -130,9 +130,7 @@ class MaximumIntensityLockmassEstimator(LockmassEstimator):
             Output array to store the results. If None, a new array will be created.
         """
         out = np.zeros(self.n_peaks, dtype=np.float32) if out is None else out
-        return _estimate_lockmass_maximum(
-            mz_y, self.masks, out
-        )
+        return _estimate_lockmass_maximum(mz_y, self.masks, self.offsets, out)
     
 class WeightedIntensityLockmassEstimator(LockmassEstimator):
     """Weighted intensity lockmass estimator."""
@@ -153,7 +151,7 @@ class WeightedIntensityLockmassEstimator(LockmassEstimator):
         super().__init__(mz_x, peaks)
         self.window = window
 
-        self.mz_indices, self.peak_indices, self.masks = _prepare_lockmass(mz_x, self.peaks, window)
+        self.mz_indices, self.peak_indices, self.masks, _ = _prepare_lockmass(mz_x, self.peaks, window)
         self.centroid_func = fast_parabolic_centroid
     
     def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
@@ -177,23 +175,25 @@ class WeightedIntensityLockmassEstimator(LockmassEstimator):
 
 def _prepare_lockmass(
     x: np.ndarray, peaks: ty.Iterable[float], window: float = 0.1
-) -> tuple[np.ndarray, np.ndarray, dict[float, np.ndarray]]:
+) -> tuple[np.ndarray, np.ndarray, dict[float, np.ndarray], dict[float, int]]:
     mz_indices = np.arange(x.shape[0])
 
     peak_indices = find_nearest_index(x, peaks)
     masks = {peak: get_array_mask(x, peak - window, peak + window) for peak in peaks}
-    return mz_indices, peak_indices, masks
+    offsets = {peak: find_nearest_index(x[masks[peak]], peak) for peak in peaks}
+    return mz_indices, peak_indices, masks, offsets
 
 
 def _estimate_lockmass_maximum(
     mz_y: np.ndarray,
-    masks: dict,
+    masks: dict[float, np.ndarray],
+    offsets: dict[float, int],
     out: np.ndarray | None = None,
 ) -> np.ndarray:
     """Estimate lockmass shifts using maximum intensity."""
     out = np.zeros(len(masks), dtype=np.float32) if out is None else out
     for j, (_peak, mask) in enumerate(masks.items()):
-        out[j] = np.argmax(mz_y[mask])
+        out[j] = np.argmax(mz_y[mask]) - offsets[_peak]
     return out
 
 

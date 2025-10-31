@@ -779,9 +779,9 @@ def find_between_batch(array: np.ndarray, min_value: np.ndarray, max_value: np.n
 
 
 @numba.njit(fastmath=True, cache=True)
-def get_window_for_ppm(mz: float, ppm: float) -> float:
+def get_window_for_ppm(mz: float, ppm: float, scale: float = 1e-7) -> float:
     """Calculate window size for specified peak at specified ppm."""
-    step = mz * 1e-7  # calculate appropriate step size for specified mz value
+    step = mz * scale  # calculate appropriate step size for specified mz value
     peak_x_ppm = mz
     is_subtract = ppm < 0
     ppm = abs(ppm)

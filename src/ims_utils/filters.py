@@ -407,7 +407,7 @@ class PpmPeakRecalibrate(FilterBase):
         """Filter."""
         from ims_utils.spectrum import get_window_for_ppm
 
-        offsets = np.asarray([get_window_for_ppm(p, self.ppm) for p in mz_array])
+        offsets = np.asarray([get_window_for_ppm(p, self.ppm, 1e-6) for p in mz_array])
         return mz_array - offsets, intensity_array
 
 

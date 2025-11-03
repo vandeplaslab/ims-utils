@@ -53,7 +53,7 @@ def calculate_mfc_inter_normalization(centroids: dict[str, np.ndarray]) -> tuple
     if len(centroids) == 1:
         raise ValueError("Only one centroid found. Inter-normalization is not possible.")
 
-    obj = CentroidInterNorm()
+    obj = CentroidMeanFoldInterNorm()
     for name, centroid in tqdm(centroids.items(), desc="Collecting centroids for inter-normalization..."):
         obj(name, centroid)
     return obj.finalize()

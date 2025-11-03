@@ -1030,6 +1030,62 @@ def get_multi_ppm_offsets(mz_x: np.ndarray, ppm_ranges, min_spacing: float = 1e-
     return full_offsets
 
 
+def simulate_gaussian_peak(
+    mz0: float,
+    resolving_power: float,
+    height: float = 1.0,
+    num_points: int = 2001,
+    window_size: float = 5.0,
+) -> tuple[np.ndarray, np.ndarray, float, float]:
+    """
+    Simulate a Gaussian peak given its m/z location and resolving power.
+
+    Parameters
+    ----------
+    mz0 : float
+        Center m/z of the peak.
+    resolving_power : float
+        Resolving power (m / Δm_FWHM).
+    height : float, optional
+        Peak height. Default is 1.0.
+    num_points : int, optional
+        Number of m/z samples across the window.
+    window_size : float, optional
+        Range in units of FWHM around mz0 to simulate (half on each side).
+
+    Returns
+    -------
+    mz_axis : np.ndarray
+        m/z axis over which the peak is simulated.
+    intensity : np.ndarray
+        Simulated Gaussian intensity values.
+    fwhm : float
+        Full width at half maximum of the peak.
+    sigma : float
+        Standard deviation of the Gaussian.
+
+    Notes
+    -----
+    Relationships:
+        FWHM = mz0 / resolving_power
+        sigma = FWHM / (2 * sqrt(2 * ln(2)))
+        I(mz) = height * exp(-0.5 * ((mz - mz0) / sigma)**2)
+    """
+    # compute FWHM and sigma
+    fwhm = mz0 / resolving_power
+    sigma = fwhm / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+
+    # define m/z range: ±window_size * FWHM
+    mz_min = mz0 - window_size * fwhm
+    mz_max = mz0 + window_size * fwhm
+    mz_axis = np.linspace(mz_min, mz_max, num_points)
+
+    # Gaussian intensity
+    intensity = height * np.exp(-0.5 * ((mz_axis - mz0) / sigma) ** 2)
+
+    return mz_axis, intensity, fwhm, sigma
+
+
 def _precompile() -> None:
     """Precompile numba functions."""
     import os

@@ -1,16 +1,14 @@
 """Various functions to convert centroid peaks to a profile spectrum."""
 
+from __future__ import annotations
+
+import typing as ty
+
 import numpy as np
 from koyo.utilities import rescale
+from numba import njit
 
 from ims_utils.spectrum import ppm_to_delta_mass
-
-try:
-    from numba import njit
-
-    HAS_NUMBA = True
-except ImportError:
-    HAS_NUMBA = False
 
 try:
     from ms_peak_picker import FittedPeak
@@ -32,8 +30,8 @@ def _ensure_1d(a: np.ndarray, name: str) -> np.ndarray:
 
 
 def _compute_sigma(mz, *, resolving_power=None, fwhm=None, fwhm_func=None):
-    """
-    Return sigma array (same length as mz).
+    """Return a sigma array (same length as mz).
+
     You can specify ONE of:
       - resolving_power (scalar or array): FWHM_i = mz_i / R_i
       - fwhm (scalar or array): constant or per-peak FWHM
@@ -90,69 +88,54 @@ def _auto_grid(mz, sigma, window, points_per_fwhm=8, mz_min=None, mz_max=None, b
     return grid
 
 
-if HAS_NUMBA:
+@njit(cache=True, fastmath=True)
+def _add_peaks_numba(
+    mz_grid: np.ndarray, y: np.ndarray, mz: np.ndarray, amp: np.ndarray, sigma: np.ndarray, window: float
+):
+    n = mz.size
+    for i in range(n):
+        s = sigma[i]
+        mu = mz[i]
+        a = amp[i]
+        if s <= 0.0 or a == 0.0:
+            continue
+        left = mu - window * s
+        right = mu + window * s
 
-    @njit(cache=True, fastmath=True)
-    def _add_peaks_numba(
-        mz_grid: np.ndarray, y: np.ndarray, mz: np.ndarray, amp: np.ndarray, sigma: np.ndarray, window: float
-    ):
-        n = mz.size
-        for i in range(n):
-            s = sigma[i]
-            mu = mz[i]
-            a = amp[i]
-            if s <= 0.0 or a == 0.0:
-                continue
-            left = mu - window * s
-            right = mu + window * s
+        # searchsorted equivalents
+        # numba supports np.searchsorted on 1D arrays
+        start = np.searchsorted(mz_grid, left)
+        end = np.searchsorted(mz_grid, right)
 
-            # searchsorted equivalents
-            # numba supports np.searchsorted on 1D arrays
-            start = np.searchsorted(mz_grid, left)
-            end = np.searchsorted(mz_grid, right)
+        if start < 0:
+            start = 0
+        if end > mz_grid.size:
+            end = mz_grid.size
 
-            if start < 0:
-                start = 0
-            if end > mz_grid.size:
-                end = mz_grid.size
-
-            for j in range(start, end):
-                dx = mz_grid[j] - mu
-                y[j] += a * np.exp(-0.5 * (dx * dx) / (s * s))
-else:
-
-    def _add_peaks_numba(mz_grid, y, mz, amp, sigma, window):
-        # Pure NumPy fallback (windowed), slightly slower but robust.
-        for mu, a, s in zip(mz, amp, sigma):
-            if s <= 0.0 or a == 0.0:
-                continue
-            left = mu - window * s
-            right = mu + window * s
-            start = np.searchsorted(mz_grid, left)
-            end = np.searchsorted(mz_grid, right)
-            x = mz_grid[start:end]
-            y[start:end] += a * np.exp(-0.5 * ((x - mu) / s) ** 2)
+        for j in range(start, end):
+            dx = mz_grid[j] - mu
+            y[j] += a * np.exp(-0.5 * (dx * dx) / (s * s))
 
 
 def centroid_to_profile(
-    x,
-    y,
+    x: np.ndarray,
+    y: np.ndarray,
     *,
     sort: bool = False,
     # Resolution controls (pick one): resolving_power OR fwhm OR fwhm_func
-    resolving_power=None,
-    fwhm=None,
-    fwhm_func=None,
+    resolving_power: float | np.ndarray | None = None,
+    fwhm: float | np.ndarray | None = None,
+    fwhm_func: ty.Callable | None = None,
     # Grid controls
-    mz_grid=None,
-    mz_min=None,
-    mz_max=None,
-    bin_width=None,
-    points_per_fwhm=8,
+    mz_grid: np.ndarray | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+    bin_width: float | None = None,
+    points_per_fwhm: int = 8,
     # Peak rendering
-    window=5.0,
-    intensity_mode="height",  # "height" or "area"
-    dtype=np.float64,
+    window: float = 5.0,
+    intensity_mode: ty.Literal["height", "area"] = "height",  # "height" or "area"
+    dtype: np.dtype = np.float64,
 ):
     """
     Convert centroid peaks (mz, intensity) to a summed Gaussian profile.

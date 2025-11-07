@@ -212,7 +212,7 @@ try:
     _local_extreme = local_extreme
     _mexican_hat = mexican_hat
     _cwt = cwt
-    from imimspy.c.processing.utils.wavelets import (
+    from ims_utils.c.processing.utils.wavelets import (
         cwt,
         local_extreme,
         mexican_hat,

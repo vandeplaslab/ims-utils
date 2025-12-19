@@ -1,4 +1,5 @@
 """Inter normalization utilities."""
+
 from __future__ import annotations
 import numpy as np
 from tqdm import tqdm
@@ -8,15 +9,18 @@ class CentroidMeanFoldInterNorm:
     """Centroid inter-normalization methods."""
 
     def __init__(self):
-         self.tmp_centroids = []
-         self.tmo_names = []
-         self.centroids_ref = None
-         self.scales = None
+        self.tmp_centroids = []
+        self.tmo_names = []
+        self.centroids_ref = None
+        self.scales = None
 
     def __call__(self, name: str, centroid: np.ndarray) -> None:
         """Collect centroid data."""
         self.tmp_centroids.append(_get_mean_fold_change(centroid))
         self.tmo_names.append(name)
+        for arr in self.tmp_centroids:
+            if not np.all(arr.shape == self.tmp_centroids[0].shape):
+                raise ValueError("All centroids must have the same number of features.")
 
     def finalize(self, as_dict: bool = False) -> tuple[list[str], np.ndarray] | dict[str, float]:
         """Finalize inter-normalization calculation."""

@@ -332,5 +332,6 @@ def make_difference_spectrum(
         template="simple_white",
         width=1200,  # Adjust width here
         height=800,  # Adjust height here
+        xaxis={"range": [mz_x[0], mz_x[-1]]},
     )
     return fig

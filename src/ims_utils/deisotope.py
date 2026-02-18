@@ -80,7 +80,7 @@ def _deisotope(xs, ys, min_dist, max_dist):
 def oms_deisotope(
     px: np.ndarray,
     py: np.ndarray,
-    charge_range: ty.Tuple[int, int],
+    charge_range: tuple[int, int],
     fragment_tolerance: int = 10,
     fragment_unit_ppm: bool = True,
     min_isotopes: int = 2,
@@ -92,6 +92,7 @@ def oms_deisotope(
     make_single_charged: bool = False,
     keep_only_deisotoped: bool = False,
     add_up_intensity: bool = False,
+    annotate_features: bool = False,
 ):
     """Deisotope peaklist using pyopenms methods."""
     from pyopenms import Deisotoper, MSSpectrum  # type: ignore
@@ -116,6 +117,7 @@ def oms_deisotope(
         use_decreasing_model,
         start_intensity_check,
         add_up_intensity,
+        annotate_features,
     )
 
     px, py = spec.get_peaks()

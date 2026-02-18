@@ -254,24 +254,30 @@ class KneeLocator:
 
         return knee, norm_knee
 
-    def plot_knee_normalized(self) -> plt.Figure:
+    def plot_knee(self, x_label: str = "k", y_label: str = "metric") -> plt.Figure:
+        """Plot the curve and the knee, if it exists."""
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.plot(self.x, self.y, marker="o")
+        ax.vlines(self.knee, plt.ylim()[0], plt.ylim()[1])
+        ax.set_xlabel(x_label, fontsize=14)
+        ax.set_ylabel(y_label, fontsize=14)
+        ax.set_title("KneeLocator: Knee Point Detection\nBest Knee: {}".format(self.knee))
+        return fig
+
+    def plot_knee_normalized(self, x_label: str = "k", y_label: str = "metric") -> plt.Figure:
         """
         Plots the normalized curve, the distance curve (x_distance, y_normalized) and the
         knee, if it exists.
         """
         fig, ax = plt.subplots(figsize=(8, 8))
-        plt.plot(self.x_normalized, self.y_normalized)
-        plt.plot(self.x_difference, self.y_difference, "r")
-        plt.xticks(np.arange(self.x_normalized.min(), self.x_normalized.max() + 0.1, 0.1))
-        plt.yticks(np.arange(self.y_difference.min(), self.y_normalized.max() + 0.1, 0.1))
-        plt.vlines(self.norm_knee, plt.ylim()[0], plt.ylim()[1])
-        return fig
-
-    def plot_knee(self) -> plt.Figure:
-        """Plot the curve and the knee, if it exists."""
-        fig, ax = plt.subplots(figsize=(8, 8))
-        ax.plot(self.x, self.y)
-        ax.vlines(self.knee, plt.ylim()[0], plt.ylim()[1])
+        ax.plot(self.x_normalized, self.y_normalized, "b", marker="o")
+        ax.plot(self.x_difference, self.y_difference, "r", marker="o")
+        ax.set_xticks(np.arange(self.x_normalized.min(), self.x_normalized.max() + 0.1, 0.1))
+        ax.set_yticks(np.arange(self.y_difference.min(), self.y_normalized.max() + 0.1, 0.1))
+        ax.vlines(self.norm_knee, plt.ylim()[0], plt.ylim()[1])
+        ax.set_xlabel(x_label, fontsize=14)
+        ax.set_ylabel(y_label, fontsize=14)
+        ax.set_title("KneeLocator: Knee Point Detection\nBest Knee: {}".format(self.norm_knee))
         return fig
 
     # Niceties for users working with elbows rather than knees

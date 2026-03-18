@@ -320,6 +320,15 @@ def filter_groups(groups: list[tuple[list[int], list[float]]], intensities: npt.
     return np.unique(indices_to_keep)
 
 
+def filter_groups_first(groups: list[tuple[list[int], list[float]]]) -> npt.NDArray:
+    """Filter groups of centroids."""
+    indices_to_keep = []
+    for indices, _ in groups:
+        index = indices[0]
+        indices_to_keep.append(index)
+    return np.unique(indices_to_keep)
+
+
 def get_info(indices: list[int], intensities: npt.NDArray) -> tuple[int, list[str]]:
     """Return information about each item in a group."""
     from ims_utils.utilities import find_highest

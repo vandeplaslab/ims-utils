@@ -102,23 +102,40 @@ def oms_deisotope(
 
     min_charge, max_charge = charge_range
 
-    Deisotoper.deisotopeAndSingleCharge(
-        spec,
-        fragment_tolerance,
-        fragment_unit_ppm,
-        abs(min_charge),
-        abs(max_charge),
-        keep_only_deisotoped,
-        min_isotopes,
-        max_isotopes,
-        make_single_charged,
-        annotate_charge,
-        annotate_iso_peak_count,
-        use_decreasing_model,
-        start_intensity_check,
-        add_up_intensity,
-        annotate_features,
-    )
-
+    try:
+        Deisotoper.deisotopeAndSingleCharge(
+            spec,
+            fragment_tolerance,
+            fragment_unit_ppm,
+            abs(min_charge),
+            abs(max_charge),
+            keep_only_deisotoped,
+            min_isotopes,
+            max_isotopes,
+            make_single_charged,
+            annotate_charge,
+            annotate_iso_peak_count,
+            use_decreasing_model,
+            start_intensity_check,
+            add_up_intensity,
+            annotate_features,
+        )
+    except TypeError:
+        Deisotoper.deisotopeAndSingleCharge(
+            spec,
+            fragment_tolerance,
+            fragment_unit_ppm,
+            abs(min_charge),
+            abs(max_charge),
+            keep_only_deisotoped,
+            min_isotopes,
+            max_isotopes,
+            make_single_charged,
+            annotate_charge,
+            annotate_iso_peak_count,
+            use_decreasing_model,
+            start_intensity_check,
+            add_up_intensity,
+        )
     px, py = spec.get_peaks()
     return px, py

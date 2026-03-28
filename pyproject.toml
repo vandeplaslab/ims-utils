@@ -33,7 +33,7 @@ dependencies = [
     "numpy",
     "scipy",
     "numba",
-    "koyo",
+    "koyo>=0.3.5",
     "msalign",
     "loguru",
     "tqdm",
@@ -49,7 +49,7 @@ oms = [
     "pyopenms>=2.7.0; python_version < '3.10'"
 ]
 batch = [
-    "pandas",
+    "pandas>=2.2,<4",
     "scikit-learn",
     "mpire",
     "patsy",

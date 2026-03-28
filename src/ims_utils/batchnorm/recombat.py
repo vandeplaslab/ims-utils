@@ -18,7 +18,7 @@ from multiprocessing import cpu_count
 import numpy as np
 import pandas as pd
 from koyo.timer import MeasureTimer
-from koyo.utilities import is_installed
+from koyo.system import is_installed
 from loguru import logger
 from tqdm import tqdm
 

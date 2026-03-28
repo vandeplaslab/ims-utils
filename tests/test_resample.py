@@ -14,7 +14,7 @@ def test_resampler_multiple():
     assert resampler.mz_new is not None, "mz_new is None"
 
     new_xs = np.arange(1, 51)
-    new_ys = np.random.randint(0, 100, 50)
+    new_ys = np.random.default_rng().integers(0, 100, 50)
     resampled_xs, resampled_ys = resampler(new_xs, new_ys)
     assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
     assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"
@@ -29,19 +29,19 @@ def test_resampler_single():
     assert resampler.mz is not None, "mz_new is None"
 
     new_xs = np.arange(1, 51)
-    new_ys = np.random.randint(0, 100, new_xs.size)
+    new_ys = np.random.default_rng().integers(0, 100, new_xs.size)
     resampled_xs, resampled_ys = resampler(new_xs, new_ys)
     assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
     assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"
 
     new_xs = np.arange(1, 151)
-    new_ys = np.random.randint(0, 100, new_xs.size)
+    new_ys = np.random.default_rng().integers(0, 100, new_xs.size)
     resampled_xs, resampled_ys = resampler(new_xs, new_ys)
     assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
     assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"
 
     new_xs = np.arange(11, 151)
-    new_ys = np.random.randint(0, 100, new_xs.size)
+    new_ys = np.random.default_rng().integers(0, 100, new_xs.size)
     resampled_xs, resampled_ys = resampler(new_xs, new_ys)
     assert resampled_xs.size == resampled_ys.size, "resampled_xs and resampled_ys have different sizes"
     assert resampled_xs.size != new_xs.size, "resampled_xs and new_xs have the same size"

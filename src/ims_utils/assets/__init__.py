@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from koyo.utilities import get_module_path
+from koyo.system import get_module_path
 
 HERE = Path(get_module_path("spec_utils.assets", "__init__.py")).parent.resolve()
 

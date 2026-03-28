@@ -9,10 +9,10 @@ from ims_utils.internorm import (
     calculate_tic_inter_normalization,
 )
 
-ARRAY_2D = np.random.randint(0, 255, (100, 10)) * 1.0
+ARRAY_2D = np.random.default_rng().integers(0, 255, (100, 10)) * 1.0
 DATA_2D = {"a": ARRAY_2D, "b": ARRAY_2D * 2.0, "c": ARRAY_2D * 0.5}
 
-ARRAY_1D = np.random.randint(0, 255, (100,)) * 1.0
+ARRAY_1D = np.random.default_rng().integers(0, 255, (100,)) * 1.0
 DATA_1D = {"a": ARRAY_1D, "b": ARRAY_1D * 2.0, "c": ARRAY_1D * 0.5}
 
 

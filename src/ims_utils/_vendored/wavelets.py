@@ -10,10 +10,10 @@ It is a pretty good wavelet-based peak picker that should be useful for DT peak 
 # -*- coding: utf-8 -*-
 # __author__ lukasz.g.migas
 
-# Standard library imports
+
 from collections import deque
 
-# Third-party imports
+
 import numpy as np
 from scipy.signal import fftconvolve
 from scipy.stats import mode, scoreatpercentile

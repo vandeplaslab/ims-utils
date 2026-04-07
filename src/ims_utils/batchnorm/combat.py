@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import typing as ty
 
+import numba as nb
 import numpy as np
-import pandas as pd
 from koyo.timer import MeasureTimer
 from loguru import logger
 from numpy import linalg as la
 from scipy.sparse import issparse
+
+from ims_utils.batchnorm.utilities import _one_hot_encode
+
+if ty.TYPE_CHECKING:
+    import pandas as pd
 
 
 class ComBat:
@@ -23,14 +28,213 @@ class ComBat:
         return combat(array, batches, key=self.key)
 
 
+@nb.njit(fastmath=True, cache=True)
+def _nb_it_sol(
+    s_data: np.ndarray,
+    g_hat: np.ndarray,
+    d_hat: np.ndarray,
+    g_bar: float,
+    t2: float,
+    a: float,
+    b: float,
+    conv: float,
+) -> tuple:
+    """Numba JIT empirical Bayes iteration (inner loop of :func:`_it_sol`).
+
+    Parameters
+    ----------
+    s_data : float64[n_genes, n_batch_samples]
+        Standardized data for one batch (genes x samples).
+    g_hat, d_hat : float64[n_genes]
+        Initial estimates for additive / multiplicative batch effect.
+    g_bar, t2, a, b : float
+        Hyperparameters.
+    conv : float
+        Convergence criterion.
+
+    Returns
+    -------
+    (g_new, d_new)
+    """
+    n_genes = s_data.shape[0]
+    n_samples = s_data.shape[1]
+
+    # Count non-NaN samples per gene (row-wise, cache-friendly for row-major)
+    n = np.empty(n_genes)
+    for i in range(n_genes):
+        c = 0
+        for j in range(n_samples):
+            if not np.isnan(s_data[i, j]):
+                c += 1
+        n[i] = float(c)
+
+    tn = t2 * n  # t2 * n[i], precomputed
+
+    g_old = g_hat.copy()
+    d_old = d_hat.copy()
+    g_new = g_old.copy()
+    d_new = d_old.copy()
+
+    change = 1.0
+    while change > conv:
+        # Update gamma
+        for i in range(n_genes):
+            g_new[i] = (tn[i] * g_hat[i] + d_old[i] * g_bar) / (tn[i] + d_old[i])
+
+        # Update delta — inner loop over samples is cache-friendly (row-major)
+        for i in range(n_genes):
+            ss = 0.0
+            gi = g_new[i]
+            for j in range(n_samples):
+                d = s_data[i, j] - gi
+                ss += d * d
+            d_new[i] = (0.5 * ss + b) / (n[i] / 2.0 + a - 1.0)
+
+        # Convergence: max relative change (matches original formula)
+        c1 = 0.0
+        for i in range(n_genes):
+            v = abs(g_new[i] - g_old[i]) / g_old[i]
+            if v > c1:
+                c1 = v
+        c2 = 0.0
+        for i in range(n_genes):
+            v = abs(d_new[i] - d_old[i]) / d_old[i]
+            if v > c2:
+                c2 = v
+        change = c1 if c1 > c2 else c2
+
+        g_old[:] = g_new
+        d_old[:] = d_new
+
+    return g_new, d_new
+
+
+def _it_sol(
+    s_data: np.ndarray,
+    g_hat: np.ndarray,
+    d_hat: np.ndarray,
+    g_bar: float,
+    t2: float,
+    a: float,
+    b: float,
+    conv: float = 0.0001,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Iteratively compute the conditional posterior means for gamma and delta.
+
+    Dispatches to a numba JIT inner loop.  See :func:`_nb_it_sol` for the
+    algorithmic details.
+
+    Parameters
+    ----------
+    s_data
+        Contains the standardized data (n_genes x n_batch_samples).
+    g_hat
+        Initial guess for gamma.
+    d_hat
+        Initial guess for delta.
+    g_bar, t2, a, b
+        Hyperparameters.
+    conv : float, optional (default: ``0.0001``)
+        Convergence criterion.
+
+    Returns
+    -------
+    g_new
+        Estimated value for gamma.
+    d_new
+        Estimated value for delta.
+    """
+    return _nb_it_sol(
+        np.ascontiguousarray(s_data, dtype=np.float64),
+        np.asarray(g_hat, dtype=np.float64),
+        np.asarray(d_hat, dtype=np.float64),
+        float(g_bar),
+        float(t2),
+        float(a),
+        float(b),
+        float(conv),
+    )
+
+
+def _aprior(delta_hat: np.ndarray) -> float:
+    m = delta_hat.mean()
+    s2 = delta_hat.var()
+    return (2 * s2 + m**2) / s2
+
+
+def _bprior(delta_hat: np.ndarray) -> float:
+    m = delta_hat.mean()
+    s2 = delta_hat.var()
+    return (m * s2 + m**3) / s2
+
+
+def _standardize_data(
+    design: np.ndarray,
+    data: np.ndarray,
+    n_batch: int,
+    n_batches: np.ndarray,
+    n_array: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Standardize data per gene.
+
+    All operations are in numpy — no pandas DataFrame involved.
+
+    Parameters
+    ----------
+    design : float64[n_obs, n_design_cols]
+        Full design matrix (batch one-hot columns first).
+    data : float64[n_genes, n_obs]
+        Raw data in ComBat's genes x samples orientation.
+    n_batch : int
+        Number of batch columns in ``design``.
+    n_batches : int[n_batch]
+        Number of samples per batch.
+    n_array : float
+        Total number of samples.
+
+    Returns
+    -------
+    s_data : float64[n_genes, n_obs]
+        Standardized data.
+    var_pooled : float64[n_genes, 1]
+        Pooled per-gene variance.
+    stand_mean : float64[n_genes, n_obs]
+        Per-gene grand-mean broadcast across samples.
+    """
+    # Solve for the regression coefficients: b_hat[n_design_cols, n_genes]
+    b_hat = la.solve(design.T @ design, design.T @ data.T)
+
+    grand_mean = (n_batches / n_array) @ b_hat[:n_batch, :]  # (n_genes,)
+
+    # Pooled variance: mean squared residual across all samples
+    fitted = design @ b_hat  # (n_obs, n_genes)
+    residuals = data.T - fitted  # (n_obs, n_genes)
+    var_pooled = (residuals**2).mean(axis=0, keepdims=True).T  # (n_genes, 1)
+
+    if np.any(var_pooled == 0):
+        logger.warning(f"Found {np.sum(var_pooled == 0)} genes with zero variance.")
+
+    # Stand mean: grand mean + covariate contribution (batch cols zeroed out)
+    stand_mean = np.outer(grand_mean, np.ones(int(n_array)))  # (n_genes, n_obs)
+    if design.shape[1] > n_batch:
+        tmp = design.copy()
+        tmp[:, :n_batch] = 0.0
+        stand_mean += (tmp @ b_hat).T
+
+    # Standardize
+    sqrt_var = np.sqrt(var_pooled)  # (n_genes, 1)
+    s_data = np.where(var_pooled == 0, 0.0, (data - stand_mean) / sqrt_var)
+
+    return s_data, var_pooled, stand_mean
+
+
 def combat(
     array: np.ndarray,
     batches: np.ndarray | pd.Series,
     key: str = "batches",
-) -> np.ndarray | np.ndarray | None:
-    """
-    ComBat function for batch effect correction [Johnson07]_ [Leek12]_
-    [Pedersen12]_.
+) -> np.ndarray:
+    """ComBat function for batch effect correction [Johnson07]_ [Leek12]_ [Pedersen12]_.
+
     Corrects for batch effects by fitting linear models, gains statistical power
     via an EB framework where information is borrowed across genes.
     This uses the implementation `combat.py`_ [Pedersen12]_.
@@ -50,272 +254,74 @@ def combat(
     np.ndarray
         Corrected array.
     """
-    # only works on dense matrices so far
-    data = pd.DataFrame(data=array.toarray().T if issparse(array) else array.T)  # type: ignore
+    # Work in ComBat's genes x samples orientation
+    X = array.toarray().T if issparse(array) else array.T  # (n_genes, n_obs)
+    X = np.asarray(X, dtype=np.float64)
 
-    # construct a pandas series of the batch annotation
-    if isinstance(batches, np.ndarray):
-        batches = pd.Series(batches, name=key)
-    batches = pd.DataFrame(batches, columns=[key])
-    batch_info = batches.groupby(key).indices.values()
-    n_batch = len(batch_info)
+    # Normalise batch labels to a string array for consistent ordering
+    try:
+        import pandas as pd
+
+        if isinstance(batches, (pd.Series, pd.DataFrame)):
+            batch_labels = batches.values.ravel().astype(str)
+        else:
+            batch_labels = np.asarray(batches).astype(str)
+    except ImportError:
+        batch_labels = np.asarray(batches).astype(str)
+
+    _, batch_info, design = _one_hot_encode(batch_labels)
+    n_batch = design.shape[1]
     n_batches = np.array([len(v) for v in batch_info])
-    n_array = float(sum(n_batches))
+    n_array = float(X.shape[1])
 
-    # standardize across genes using a pooled variance estimator
+    # Standardize across genes using a pooled variance estimator
     with MeasureTimer(func=logger.debug, msg="Standardized data {}"):
-        s_data, design, var_pooled, stand_mean = _standardize_data(batches, data, key)
-        # cleanup
-        del batches, data
+        s_data, var_pooled, stand_mean = _standardize_data(design, X, n_batch, n_batches, n_array)
 
-    # fitting the parameters on the standardized data
+    # Fit parameters on the standardized data
     with MeasureTimer(func=logger.debug, msg="Fitted model in {}"):
-        batch_design = design[design.columns[:n_batch]]
-        # first estimate of the additive batch effect
-        gamma_hat = (la.inv(batch_design.T @ batch_design) @ batch_design.T @ s_data.T).values
-        delta_hat = []
+        batch_design = design[:, :n_batch]  # (n_obs, n_batches)
 
-        # first estimate for the multiplicative batch effect
-        for i, batch_index in enumerate(batch_info):
-            delta_hat.append(s_data.iloc[:, batch_index].var(axis=1))
+        # First estimate of the additive batch effect: (n_batches, n_genes)
+        gamma_hat = la.solve(batch_design.T @ batch_design, batch_design.T @ s_data.T)
 
-        # empirically fix the prior hyperparameters
-        gamma_bar = gamma_hat.mean(axis=1)
-        t2 = gamma_hat.var(axis=1)
-        # a_prior and b_prior are the priors on lambda and theta from Johnson and Li (2006)
+        # First estimate for the multiplicative batch effect per batch
+        delta_hat = [s_data[:, bi].var(axis=1) for bi in batch_info]
+
+        # Empirically fix the prior hyperparameters
+        gamma_bar = gamma_hat.mean(axis=1)  # (n_batches,)
+        t2 = gamma_hat.var(axis=1)  # (n_batches,)
         a_prior = list(map(_aprior, delta_hat))
         b_prior = list(map(_bprior, delta_hat))
 
-        # gamma star and delta star will be our empirical bayes (EB) estimators
-        # for the additive and multiplicative batch effect per batch and cell
+        # EB estimators for the additive and multiplicative batch effects
         gamma_star, delta_star = [], []
-        for i, batch_index in enumerate(batch_info):
-            # temp stores our estimates for the batch effect parameters.
-            # temp[0] is the additive batch effect
-            # temp[1] is the multiplicative batch effect
+        for i, bi in enumerate(batch_info):
             gamma, delta = _it_sol(
-                s_data.iloc[:, batch_index].values,
+                s_data[:, bi],
                 gamma_hat[i],
-                delta_hat[i].values,
+                delta_hat[i],
                 gamma_bar[i],
                 t2[i],
                 a_prior[i],
                 b_prior[i],
             )
-
             gamma_star.append(gamma)
             delta_star.append(delta)
-        # cleanup
+
         del gamma_hat, delta_hat, gamma_bar, t2, a_prior, b_prior
 
     with MeasureTimer(func=logger.debug, msg="Corrected data in {}"):
-        bayes_data = s_data
-        gamma_star = np.array(gamma_star)
-        delta_star = np.array(delta_star)
+        gamma_star = np.array(gamma_star)  # (n_batches, n_genes)
+        delta_star = np.array(delta_star)  # (n_batches, n_genes)
 
-        # we now apply the parametric adjustment to the standardized data from above
-        # loop over all batches in the data
-        for j, batch_index in enumerate(batch_info):
-            # we basically subtract the additive batch effect, rescale by the ratio
-            # of multiplicative batch effect to pooled variance and add the overall gene
-            # wise mean
-            dsq = np.sqrt(delta_star[j, :])
-            dsq = dsq.reshape((len(dsq), 1))
-            denominator = np.dot(dsq, np.ones((1, n_batches[j])))
-            value = np.array(bayes_data.iloc[:, batch_index] - np.dot(batch_design.iloc[batch_index], gamma_star).T)
-            bayes_data.iloc[:, batch_index] = value / denominator
+        # Apply the parametric correction batch by batch
+        for j, bi in enumerate(batch_info):
+            dsq = np.sqrt(delta_star[j, :, np.newaxis])  # (n_genes, 1)
+            gamma_contrib = (batch_design[bi] @ gamma_star).T  # (n_genes, n_batch)
+            s_data[:, bi] = (s_data[:, bi] - gamma_contrib) / dsq
 
-        vp_sq = np.sqrt(var_pooled).reshape((len(var_pooled), 1))
-        bayes_data = bayes_data * np.dot(vp_sq, np.ones((1, int(n_array)))) + stand_mean
-        # cleanup
-        del vp_sq, stand_mean, var_pooled, design, s_data, gamma_star, delta_star
-    return bayes_data.values.transpose()
+        s_data = s_data * np.sqrt(var_pooled) + stand_mean
+        del var_pooled, stand_mean, design, gamma_star, delta_star
 
-
-def _it_sol(
-    s_data: np.ndarray,
-    g_hat: np.ndarray,
-    d_hat: np.ndarray,
-    g_bar: float,
-    t2: float,
-    a: float,
-    b: float,
-    conv: float = 0.0001,
-) -> tuple[np.ndarray, np.ndarray]:
-    """\
-    Iteratively compute the conditional posterior means for gamma and delta.
-
-    gamma is an estimator for the additive batch effect, deltat is an estimator
-    for the multiplicative batch effect. We use an EB framework to estimate these
-    two. Analytical expressions exist for both parameters, which however depend on each other.
-    We therefore iteratively evaluate these two expressions until convergence is reached.
-
-    Parameters
-    ----------
-    s_data
-        Contains the standardized Data
-    g_hat
-        Initial guess for gamma
-    d_hat
-        Initial guess for delta
-    g_bar, t2, a, b
-        Hyperparameters
-    conv: float, optional (default: `0.0001`)
-        convergence criterium
-
-    Returns
-    -------
-    g_new
-        estimated value for gamma
-    d_new
-        estimated value for delta
-    """
-    n = (1 - np.isnan(s_data)).sum(axis=1)
-    g_old = g_hat.copy()
-    d_old = d_hat.copy()
-
-    change: float = 1.0
-    count: int = 0
-
-    # They need to be initialized for numba to properly infer types
-    g_new = g_old
-    d_new = d_old
-    # we place a normally distributed prior on gamma and inverse gamma prior on delta
-    # in the loop, gamma and delta are updated together. they depend on each other. we iterate until convergence.
-    while change > conv:
-        g_new = (t2 * n * g_hat + d_old * g_bar) / (t2 * n + d_old)
-        sum2 = s_data - g_new.reshape((g_new.shape[0], 1)) @ np.ones((1, s_data.shape[1]))
-        sum2 = sum2**2
-        sum2 = sum2.sum(axis=1)
-        d_new = (0.5 * sum2 + b) / (n / 2.0 + a - 1.0)
-
-        change = max((abs(g_new - g_old) / g_old).max(), (abs(d_new - d_old) / d_old).max())
-        g_old = g_new  # .copy()
-        d_old = d_new  # .copy()
-        count = count + 1
-    return g_new, d_new
-
-
-def _aprior(delta_hat: np.ndarray):
-    m = delta_hat.mean()
-    s2 = delta_hat.var()
-    return (2 * s2 + m**2) / s2
-
-
-def _bprior(delta_hat: np.ndarray):
-    m = delta_hat.mean()
-    s2 = delta_hat.var()
-    return (m * s2 + m**3) / s2
-
-
-def _standardize_data(
-    model: pd.DataFrame, data: pd.DataFrame, batch_key: str
-) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:
-    """\
-    Standardizes the data per gene.
-
-    The aim here is to make mean and variance be comparable across batches.
-
-    Parameters
-    ----------
-    model
-        Contains the batch annotation
-    data
-        Contains the Data
-    batch_key
-        Name of the batch column in the model matrix
-
-    Returns
-    -------
-    s_data
-        Standardized Data
-    design
-        Batch assignment as one-hot encodings
-    var_pooled
-        Pooled variance per gene
-    stand_mean
-        Gene-wise mean
-    """
-    # compute the design matrix
-    batch_items = model.groupby(batch_key).groups.items()
-    batch_levels, batch_info = zip(*batch_items)
-    n_batch = len(batch_info)
-    n_batches = np.array([len(v) for v in batch_info])
-    n_array = float(sum(n_batches))
-
-    # design = pd.get_dummies(model.astype(str))
-    design = _design_matrix(model, batch_key, batch_levels)
-
-    # compute pooled variance estimator
-    b_hat = np.dot(np.dot(la.inv(np.dot(design.T, design)), design.T), data.T)
-    grand_mean = np.dot((n_batches / n_array).T, b_hat[:n_batch, :])
-    var_pooled = (data - np.dot(design, b_hat).T) ** 2
-    var_pooled = np.dot(var_pooled, np.ones((int(n_array), 1)) / int(n_array))
-
-    # Compute the means
-    if np.sum(var_pooled == 0) > 0:
-        logger.warning(f"Found {np.sum(var_pooled == 0)} genes with zero variance.")
-    stand_mean = np.dot(grand_mean.T.reshape((len(grand_mean), 1)), np.ones((1, int(n_array))))
-    tmp = np.array(design.copy())
-    tmp[:, :n_batch] = 0
-    stand_mean += np.dot(tmp, b_hat).T
-
-    # need to be a bit careful with the zero variance genes
-    # just set the zero variance genes to zero in the standardized data
-    s_data = np.where(
-        var_pooled == 0,
-        0,
-        ((data - stand_mean) / np.dot(np.sqrt(var_pooled), np.ones((1, int(n_array))))),
-    )
-    s_data = pd.DataFrame(s_data, index=data.index, columns=data.columns)
-
-    return s_data, design, var_pooled, stand_mean
-
-
-# noinspection PyUnusedLocal
-def _design_matrix(model: pd.DataFrame, batch_key: str, batch_levels: ty.Collection[str]) -> pd.DataFrame:
-    """\
-    Computes a simple design matrix.
-
-    Parameters
-    ----------
-    model
-        Contains the batch annotation
-    batch_key
-        Name of the batch column
-
-    Returns
-    -------
-    The design matrix for the regression problem
-    """
-    import patsy
-
-    design = patsy.dmatrix(  # type: ignore
-        f"~ 0 + C(Q('{batch_key}'), levels=batch_levels)",
-        model,
-        return_type="dataframe",
-    )
-    model = model.drop([batch_key], axis=1)
-    numerical_covariates = model.select_dtypes("number").columns.values
-
-    logger.debug(f"Found {design.shape[1]} batches")
-    other_cols = [c for c in model.columns.values if c not in numerical_covariates]
-
-    if other_cols:
-        col_repr = " + ".join(f"Q('{x}')" for x in other_cols)
-        factor_matrix = patsy.dmatrix(  # type: ignore
-            f"~ 0 + {col_repr}",
-            model[other_cols],
-            return_type="dataframe",
-        )
-
-        design = pd.concat((design, factor_matrix), axis=1)
-        logger.info(f"Found {len(other_cols)} categorical variables: {', '.join(other_cols)}")
-
-    if numerical_covariates is not None:
-        logger.info(f"Found {len(numerical_covariates)} numerical variables: {', '.join(numerical_covariates)}")
-
-        for nC in numerical_covariates:
-            design[nC] = model[nC]
-
-    return design
+    return s_data.T  # (n_obs, n_genes)

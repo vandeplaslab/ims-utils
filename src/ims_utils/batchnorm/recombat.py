@@ -17,8 +17,8 @@ from multiprocessing import cpu_count
 
 import numpy as np
 import pandas as pd
-from koyo.timer import MeasureTimer
 from koyo.system import is_installed
+from koyo.timer import MeasureTimer
 from loguru import logger
 from tqdm import tqdm
 
@@ -173,9 +173,7 @@ class ReComBat:
             self.is_fitted = True
 
     def transform(self, data: pd.DataFrame, batches):
-        """
-        Transform method.
-        ----------------.
+        """Transform method.
 
         Adjusts a dataframe. Please make sure that the number of batches,
         features and design matrix features match.

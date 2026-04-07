@@ -89,7 +89,8 @@ class PeakFilter:
             self._indices_by_mz_merge = filter_groups(groups, self.intensities)
             n = len(self.mzs) - len(self._indices_by_mz_merge)
         logger.trace(
-            f"[MERGE] Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()} (tol={mz_tol}; ppm={mz_ppm})"
+            f"[MERGE] Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()} (tol={mz_tol};"
+            f" ppm={mz_ppm})"
         )
         return self._indices_by_mz_merge
 
@@ -138,7 +139,8 @@ class PeakFilter:
             n_idx = len(self._indices_by_matrix)  # type: ignore[arg-type]
             n = len(self.mzs) - n_idx
         logger.trace(
-            f"[MATRIX] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (matrix={matrix}; polarity={polarity}; tol={mz_tol}; ppm={mz_ppm})"
+            f"[MATRIX] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (matrix={matrix}; polarity={polarity};"
+            f" tol={mz_tol}; ppm={mz_ppm})"
         )
         return self._indices_by_matrix  # type: ignore[return-value]
 
@@ -149,7 +151,7 @@ class PeakFilter:
         from ims_utils.kendrick import calculate_kendrick_mass_defect, filter_by_rules
 
         with MeasureTimer() as timer:
-            km, kmd = calculate_kendrick_mass_defect(self.mzs, ref)
+            _km, kmd = calculate_kendrick_mass_defect(self.mzs, ref)
             df = pd.DataFrame({"mzs": self.mzs, "kmd": kmd})
             filtered = filter_by_rules(df, filters)
             self._indices_by_kendrick_mass = filtered.index.to_numpy()
@@ -163,14 +165,15 @@ class PeakFilter:
     def filter_by_mass_defect(self, min_defect: float = 0.0, max_defect: float = 1.0, **_kwargs: ty.Any) -> npt.NDArray:
         """Filter by mass defect."""
         with MeasureTimer() as timer:
-            mass_defect, nominal = np.modf(self.mzs)
+            mass_defect, _nominal = np.modf(self.mzs)
             # mask = np.logical_and(min_defect <= mass_defect, mass_defect <= max_defect)
             mask = np.logical_and(mass_defect >= min_defect, mass_defect <= max_defect)
             self._indices_by_mass_defect = np.arange(len(self.mzs))[~mask]
             n_idx = len(self._indices_by_mass_defect)  # type: ignore[arg-type]
             n = len(self.mzs) - n_idx
         logger.trace(
-            f"[MASS DEFECT] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (min={min_defect}; max={max_defect})"
+            f"[MASS DEFECT] Found {n_idx:,} groups (reduction of {n:,}) in {timer()} (min={min_defect};"
+            f" max={max_defect})"
         )
         return self._indices_by_mass_defect  # type: ignore[return-value]
 

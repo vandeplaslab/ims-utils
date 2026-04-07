@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
@@ -14,7 +12,6 @@ from ims_utils.robust_lockmass import (
     _nb_monotone_interp,
     _nb_ransac_quadratic,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,8 +94,7 @@ class TestNbFindAllCandidates:
         """Two Gaussian peaks in one wide window → two candidates."""
         mz_x = np.linspace(498.0, 502.0, 2000)
         mz_y = (
-            2000.0 * np.exp(-0.5 * ((mz_x - 499.5) / 0.05) ** 2)
-            + 2000.0 * np.exp(-0.5 * ((mz_x - 500.5) / 0.05) ** 2)
+            2000.0 * np.exp(-0.5 * ((mz_x - 499.5) / 0.05) ** 2) + 2000.0 * np.exp(-0.5 * ((mz_x - 500.5) / 0.05) ** 2)
         ).astype(np.float32)
         starts = np.array([0], dtype=np.int64)
         stops = np.array([len(mz_x)], dtype=np.int64)
@@ -171,10 +167,16 @@ class TestNbRansacQuadratic:
         ppms = a * mzs**2 + b * mzs + c
 
         ref_mz, obs_ppm, peak_starts, peak_counts = self._flat(mzs.tolist(), ppms.tolist())
-        best_a, best_b, best_c, n_in = _nb_ransac_quadratic(
-            ref_mz, obs_ppm, peak_starts, peak_counts,
-            np.int64(len(mzs)), np.int64(len(mzs)),
-            1.0, np.int64(3), np.int64(500),
+        best_a, _best_b, _best_c, n_in = _nb_ransac_quadratic(
+            ref_mz,
+            obs_ppm,
+            peak_starts,
+            peak_counts,
+            np.int64(len(mzs)),
+            np.int64(len(mzs)),
+            1.0,
+            np.int64(3),
+            np.int64(500),
         )
         assert n_in >= 8
         assert not np.isnan(best_a)
@@ -186,10 +188,16 @@ class TestNbRansacQuadratic:
         ppms[5] = 500.0  # outlier
 
         ref_mz, obs_ppm, peak_starts, peak_counts = self._flat(mzs.tolist(), ppms.tolist())
-        best_a, best_b, best_c, n_in = _nb_ransac_quadratic(
-            ref_mz, obs_ppm, peak_starts, peak_counts,
-            np.int64(len(mzs)), np.int64(len(mzs)),
-            10.0, np.int64(3), np.int64(500),
+        _best_a, _best_b, best_c, n_in = _nb_ransac_quadratic(
+            ref_mz,
+            obs_ppm,
+            peak_starts,
+            peak_counts,
+            np.int64(len(mzs)),
+            np.int64(len(mzs)),
+            10.0,
+            np.int64(3),
+            np.int64(500),
         )
         assert n_in >= 8  # 9 inliers (outlier rejected)
         assert not np.isnan(best_c)
@@ -200,9 +208,15 @@ class TestNbRansacQuadratic:
         ppms = [50.0, 55.0]
         ref_mz, obs_ppm, peak_starts, peak_counts = self._flat(mzs, ppms)
         best_a, _, _, n_in = _nb_ransac_quadratic(
-            ref_mz, obs_ppm, peak_starts, peak_counts,
-            np.int64(2), np.int64(2),
-            5.0, np.int64(2), np.int64(200),
+            ref_mz,
+            obs_ppm,
+            peak_starts,
+            peak_counts,
+            np.int64(2),
+            np.int64(2),
+            5.0,
+            np.int64(2),
+            np.int64(200),
         )
         assert np.isnan(best_a)
         assert n_in == 0
@@ -215,8 +229,12 @@ class TestNbRansacQuadratic:
 
         ref_mz, obs_ppm, peak_starts, peak_counts = self._flat(mzs.tolist(), ppms.tolist())
         best_a, _, _, n_in = _nb_ransac_quadratic(
-            ref_mz, obs_ppm, peak_starts, peak_counts,
-            np.int64(5), np.int64(5),
+            ref_mz,
+            obs_ppm,
+            peak_starts,
+            peak_counts,
+            np.int64(5),
+            np.int64(5),
             1.0,  # very tight tolerance — cannot fit both 10 and 500 within 1 ppm
             np.int64(5),  # require ALL 5 inliers — impossible with bi-modal data
             np.int64(500),
@@ -246,10 +264,16 @@ class TestNbRansacQuadratic:
         peak_starts = np.array(starts_list, dtype=np.int64)
         peak_counts = np.array(counts_list, dtype=np.int64)
 
-        best_a, best_b, best_c, n_in = _nb_ransac_quadratic(
-            ref_mz, obs_ppm, peak_starts, peak_counts,
-            np.int64(n_peaks), np.int64(len(ref_mz_list)),
-            10.0, np.int64(4), np.int64(500),
+        _best_a, _best_b, _best_c, n_in = _nb_ransac_quadratic(
+            ref_mz,
+            obs_ppm,
+            peak_starts,
+            peak_counts,
+            np.int64(n_peaks),
+            np.int64(len(ref_mz_list)),
+            10.0,
+            np.int64(4),
+            np.int64(500),
         )
         # At least n_peaks correct candidates should be inliers
         assert n_in >= n_peaks
@@ -325,7 +349,7 @@ class TestFindCandidates:
         peaks = np.array([ref_mz])
         mz_y = _make_spectrum(mz_x, [actual_mz], [5000.0])
         est = RobustLockmassEstimator(mz_x, peaks, search_ppm=200.0, threshold=100.0)
-        ref, obs, *_ = est._find_candidates(mz_y)
+        _ref, obs, *_ = est._find_candidates(mz_y)
         assert len(obs) >= 1
         best_idx = int(np.argmin(np.abs(obs - 50.0)))
         assert abs(obs[best_idx] - 50.0) < 5.0  # within 5 ppm of 50
@@ -336,7 +360,7 @@ class TestFindCandidates:
         peaks = np.array([500.0])
         mz_y = np.zeros(len(mz_x), dtype=np.float32)  # blank spectrum
         est = RobustLockmassEstimator(mz_x, peaks, search_ppm=200.0, threshold=ROBUST_LOCKMASS_THRESHOLD)
-        ref, obs, *_ = est._find_candidates(mz_y)
+        ref, _obs, *_ = est._find_candidates(mz_y)
         assert len(ref) == 0
 
     def test_heavy_miscalibration_still_found(self):
@@ -347,7 +371,7 @@ class TestFindCandidates:
         peaks = np.array([ref_mz])
         mz_y = _make_spectrum(mz_x, [ref_mz + shift_da], [5000.0])
         est = RobustLockmassEstimator(mz_x, peaks, search_ppm=200.0, threshold=100.0)
-        ref, obs, *_ = est._find_candidates(mz_y)
+        _ref, obs, *_ = est._find_candidates(mz_y)
         assert len(obs) >= 1
         best_idx = int(np.argmin(np.abs(obs - 150.0)))
         assert abs(obs[best_idx] - 150.0) < 10.0
@@ -373,7 +397,7 @@ class TestEstimate:
         peaks = np.array([400.0, 600.0, 800.0, 1000.0])
         mz_y = _make_spectrum(mz_x, peaks.tolist(), [5000.0] * 4)
         est = RobustLockmassEstimator(mz_x, peaks, threshold=100.0)
-        ref, obs, coeffs, inliers = est.estimate(mz_y)
+        _ref, obs, coeffs, _inliers = est.estimate(mz_y)
         assert len(obs) >= 1
         # Most inlier ppm values should be near zero
         if coeffs is not None:
@@ -434,9 +458,7 @@ class TestEstimate:
         """Two peak groups → degree-1 polynomial at most."""
         mz_x = _make_mz_axis()
         peaks = np.array([400.0, 800.0])
-        mz_y = _make_spectrum(
-            mz_x, [400.0 * (1 + 50.0 / 1e6), 800.0 * (1 + 50.0 / 1e6)], [5000.0, 5000.0]
-        )
+        mz_y = _make_spectrum(mz_x, [400.0 * (1 + 50.0 / 1e6), 800.0 * (1 + 50.0 / 1e6)], [5000.0, 5000.0])
         est = RobustLockmassEstimator(mz_x, peaks, min_inliers=1, threshold=100.0)
         _, _, coeffs, _ = est.estimate(mz_y)
         if coeffs is not None:
@@ -489,7 +511,7 @@ class TestCorrect:
         # Peak at ref_peaks[1] (700 Da) in the corrected spectrum should be near 700 Da
         idx_ref = int(np.searchsorted(mz_x, ref_peaks[1]))
         # The corrected peak should be within ±10 ppm of the reference
-        local = corrected[max(0, idx_ref - 50): idx_ref + 50]
+        local = corrected[max(0, idx_ref - 50) : idx_ref + 50]
         if len(local) > 0:
             peak_idx = int(np.argmax(local)) + max(0, idx_ref - 50)
             peak_mz = mz_x[peak_idx]
@@ -509,7 +531,7 @@ class TestCorrect:
         assert corrected.dtype == mz_y.dtype
 
         idx_ref = int(np.searchsorted(mz_x, ref_peaks[1]))
-        local = corrected[max(0, idx_ref - 50): idx_ref + 50]
+        local = corrected[max(0, idx_ref - 50) : idx_ref + 50]
         if len(local) > 0:
             peak_idx = int(np.argmax(local)) + max(0, idx_ref - 50)
             peak_mz = mz_x[peak_idx]

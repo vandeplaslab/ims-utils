@@ -20,11 +20,9 @@ from scipy.signal._peak_finding import _select_by_property, _unpack_condition_ar
 
 def has_pyopenms() -> bool:
     """Check if PyOpenMS is installed."""
-    try:
-        import pyopenms
-    except ImportError:
-        return False
-    return True
+    from koyo.system import is_installed
+
+    return is_installed("pyopenms")
 
 
 def centwave_estimate_baseline_and_noise(y: np.ndarray) -> tuple[float, float]:
@@ -44,17 +42,16 @@ def centwave_estimate_noise(y: np.ndarray, ys: np.ndarray) -> np.ndarray:
     return (ys - bl) / nl
 
 
-
 def local_estimate_noise(
     mz: np.ndarray,
     intens: np.ndarray,
-    peaks: ty.Union[ty.Sequence[int], ty.Sequence[float]],
+    peaks: ty.Sequence[int] | ty.Sequence[float],
     *,
     peaks_kind: ty.Literal["index", "mz"] = "index",
     window_ppm: float = 50.0,
-    window_da: float = None,
+    window_da: float | None = None,
     core_ppm: float = 5.0,
-    core_da: float = None,
+    core_da: float | None = None,
     min_points: int = 25,
     clip_nonpositive_noise: float = 1e-12,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -78,10 +75,10 @@ def local_estimate_noise(
     core_ppm, core_da :
         Half-width of the *core* exclusion zone centered on the peak that is removed
         from the background window before estimating baseline/noise. Again, max of ppm/Da.
-        Typical defaults: core_ppm ~ 3–10 ppm for high-res; core_da ~ 0.001–0.01 Da.
+        Typical defaults: core_ppm ~ 3-10 ppm for high-res; core_da ~ 0.001-0.01 Da.
     min_points : int
         Minimum number of points required in the background set; if fewer, the window is
-        expanded 1.5× iteratively until satisfied (bounded by spectrum edges).
+        expanded 1.5x iteratively until satisfied (bounded by spectrum edges).
     clip_nonpositive_noise : float
         Floor to avoid division by zero.
 
@@ -115,10 +112,10 @@ def local_estimate_noise(
     elif peaks_kind == "mz":
         pmz = np.asarray(peaks, dtype=float)
         # nearest neighbor indices via searchsorted
-        idx = np.clip(np.searchsorted(mz, pmz), 0, n-1)
+        idx = np.clip(np.searchsorted(mz, pmz), 0, n - 1)
         # choose closer neighbor if we're on the right side
-        right = idx < n-1
-        choose_left = right & (np.abs(pmz[right] - mz[idx[right]]) > np.abs(pmz[right] - mz[idx[right]-1]))
+        right = idx < n - 1
+        choose_left = right & (np.abs(pmz[right] - mz[idx[right]]) > np.abs(pmz[right] - mz[idx[right] - 1]))
         idx[right][choose_left] -= 1
     else:
         raise ValueError("peaks_kind must be 'index' or 'mz'.")
@@ -147,8 +144,8 @@ def local_estimate_noise(
 
         # Convert Da to index ranges using searchsorted
         def range_idx(da_half: float):
-            lo = m0 - da_half
-            hi = m0 + da_half
+            lo = m0 - da_half  # noqa: B023
+            hi = m0 + da_half  # noqa: B023
             a = np.searchsorted(mz, lo, side="left")
             b = np.searchsorted(mz, hi, side="right")
             return max(0, a), min(n, b)
@@ -165,8 +162,8 @@ def local_estimate_noise(
             if scale != 1.0:
                 a_w, b_w = range_idx(scale * w_da)
                 a_c, b_c = range_idx(scale * c_da * 0.8)  # keep core smaller than window
-            left_bg = y[a_w:max(a_c, a_w)]
-            right_bg = y[min(b_c, b_w):b_w]
+            left_bg = y[a_w : max(a_c, a_w)]
+            right_bg = y[min(b_c, b_w) : b_w]
             if left_bg.size + right_bg.size >= min_points or (a_w == 0 and b_w == n):
                 bg = (left_bg, right_bg)
                 break
@@ -195,13 +192,12 @@ def local_estimate_noise(
     return snr, baseline, noise_sig
 
 
-
 def estimate_peak_prominence(
     intensities: np.ndarray,
-    peaks: ty.Union[ty.Sequence[int], np.ndarray],
+    peaks: ty.Sequence[int] | np.ndarray,
     *,
     smooth_median_width: int = 0,
-) -> ty.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Compute peak prominence for a 1D signal (mass spectrum).
 
@@ -214,7 +210,7 @@ def estimate_peak_prominence(
     smooth_median_width : int, default 0
         Optional simple denoising: if >0, apply a running median of this width
         *only* for determining valley minima (the returned prominences are still
-        referenced to original intensities). Use an odd integer (e.g., 5–21).
+        referenced to original intensities). Use an odd integer (e.g., 5-21).
 
     Returns
     -------
@@ -229,7 +225,7 @@ def estimate_peak_prominence(
     -----
     - This mirrors the standard definition used in signal processing libraries.
     - Complexity is O(K log K + K * avg_valley_span); fast in practice since K << N.
-    - If a peak has no higher neighbor on one side, that side’s valley search extends
+    - If a peak has no higher neighbor on one side, that side's valley search extends
       to the array edge.
     """
     y = np.asarray(intensities, dtype=float)
@@ -251,7 +247,7 @@ def estimate_peak_prominence(
         # running median via sliding window (simple but OK for valley-finding)
         ys = np.empty_like(y)
         for i in range(n):
-            ys[i] = np.median(yp[i:i + 2*pad + 1])
+            ys[i] = np.median(yp[i : i + 2 * pad + 1])
         y_valley = ys
     else:
         y_valley = y  # use raw for valley search
@@ -469,7 +465,7 @@ def _parabolic_centroid(
 
 def fast_find_peaks(y: np.ndarray, height: float = 0) -> np.ndarray:
     """Faster implementation of find_peaks without all the bells and whistles."""
-    peaks, left_edges, right_edges = _local_maxima_1d(y)
+    peaks, _left_edges, _right_edges = _local_maxima_1d(y)
 
     if height is not None and height > 0:
         peak_heights = y[peaks]
@@ -643,7 +639,7 @@ def merge_peaks_by_tol(
     """Merge peaks by m/z tolerance."""
     if ion_mobility is None:
         ion_mobility = np.zeros_like(mz)
-    index_groups, peak_groups = group_peaks_by_tol(mz, combine_tol)
+    index_groups, _peak_groups = group_peaks_by_tol(mz, combine_tol)
     mz, intensity, im = apply_most_intense(mz, intensity, index_groups, ion_mobility)
     return mz, intensity, im
 
@@ -688,7 +684,7 @@ def merge_peaks(xs: list[np.ndarray], ys: list[np.ndarray], threshold: float = 0
     """Merge peaks."""
     xs, indices = np.unique(np.concatenate(xs), return_index=True)
     ys = np.concatenate(ys)[indices]
-    index_groups, peak_groups = group_peaks_by_tol(xs, threshold)
+    index_groups, _peak_groups = group_peaks_by_tol(xs, threshold)
     xs_new, ys_new = select_most_intense(xs, ys, index_groups)
     return xs_new, ys_new
 

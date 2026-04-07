@@ -115,5 +115,5 @@ def parametric_update(
         delta_star_squared_i = delta_star_squared_new_i
         iterations += 1
     if iterations >= max_iter:
-        warnings.warn("Maximum number of iterations reached", RuntimeWarning)
+        warnings.warn("Maximum number of iterations reached", RuntimeWarning, stacklevel=2)
     return gamma_star_i, delta_star_squared_i

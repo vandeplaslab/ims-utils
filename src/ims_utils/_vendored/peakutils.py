@@ -262,7 +262,7 @@ def gaussian_fit(x: np.ndarray, y: np.ndarray, center_only: bool = True):
         raise RuntimeError("At least 3 points required for Gaussian fitting")
 
     initial = [np.max(y), x[0], (x[1] - x[0]) * 5]
-    params, pcov = optimize.curve_fit(gaussian, x, y, initial)
+    params, _pcov = optimize.curve_fit(gaussian, x, y, initial)
 
     if center_only:
         return params[1]

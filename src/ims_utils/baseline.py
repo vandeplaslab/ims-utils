@@ -44,10 +44,7 @@ def _curve(data, window: int):
 
 
 def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e-3, **_kwargs):
-    """
-    Taken from: https://peakutils.readthedocs.io/en/latest/index.html
-    -----------------------------------------------------------------
-    Computes the baseline of a given data.
+    """Computes the baseline of a given data.
 
     Iteratively performs a polynomial fitting in the data to detect its
     baseline. At every iteration, the fitting weights on the regions with
@@ -73,6 +70,10 @@ def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e
     -------
     ndarray
         Array with the baseline amplitude for every original point in *y*
+
+    Notes
+    -----
+    Taken from: https://peakutils.readthedocs.io/en/latest/index.html.
     """
     import scipy.linalg
 
@@ -109,7 +110,9 @@ def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e
 
 
 def als(y, lam, p, niter=10):
-    """Asymmetric Least Squares smoothing. There are two parameters p for asymmetry and lambda for smoothness.
+    """Asymmetric Least Squares smoothing.
+
+    There are two parameters p for asymmetry and lambda for smoothness.
     Values of p should range between 0.001 and 0.1 and lambda between 10^2 to 10^9.
     """
     from scipy import sparse

@@ -15,10 +15,10 @@ from ims_utils.lockmass import (
     fast_roll,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_profile(n: int = 1000, peak_mz: float = 500.0, window: float = 0.5, peak_intensity: float = 2000.0):
     """Return (mz_x, mz_y) with a single Gaussian peak centred at peak_mz."""
@@ -31,6 +31,7 @@ def _make_profile(n: int = 1000, peak_mz: float = 500.0, window: float = 0.5, pe
 # ---------------------------------------------------------------------------
 # fast_roll
 # ---------------------------------------------------------------------------
+
 
 class TestFastRoll:
     def test_zero_shift_returns_same_array(self):
@@ -90,6 +91,7 @@ class TestFastRoll:
 # _prepare_lockmass
 # ---------------------------------------------------------------------------
 
+
 class TestPrepareLockmass:
     def test_returns_correct_shapes(self):
         mz_x = np.linspace(490, 510, 1000)
@@ -108,23 +110,24 @@ class TestPrepareLockmass:
         # LockmassEstimator sorts peaks before calling _prepare_lockmass; pass sorted peaks here
         mz_x = np.linspace(490, 510, 1000)
         peaks = np.array([495.0, 500.0, 505.0])  # already sorted
-        _, peak_indices, _, _, starts, stops, _ = _prepare_lockmass(mz_x, peaks)
+        _, peak_indices, _, _, starts, _stops, _ = _prepare_lockmass(mz_x, peaks)
         assert peak_indices[0] < peak_indices[1] < peak_indices[2]
         assert starts[0] < starts[1] < starts[2]
 
     def test_slice_arrays_are_contiguous_views(self):
         mz_x = np.linspace(490, 510, 1000)
         peaks = np.array([500.0])
-        _, _, masks, _, starts, stops, offsets_arr = _prepare_lockmass(mz_x, peaks)
+        _, _, masks, _, starts, stops, _offsets_arr = _prepare_lockmass(mz_x, peaks)
         # Slice-based view should match boolean-mask indexed values
         s, e = int(starts[0]), int(stops[0])
-        mask = list(masks.values())[0]
+        mask = next(iter(masks.values()))
         np.testing.assert_array_equal(mz_x[s:e], mz_x[mask])
 
 
 # ---------------------------------------------------------------------------
 # _nb_estimate_lockmass_maximum
 # ---------------------------------------------------------------------------
+
 
 class TestNbEstimateLockmassMaximum:
     def setup_method(self):
@@ -153,19 +156,26 @@ class TestNbEstimateLockmassMaximum:
 # _nb_estimate_lockmass_shifts
 # ---------------------------------------------------------------------------
 
+
 class TestNbEstimateLockmassShifts:
     def setup_method(self):
         self.mz_x, self.mz_y = _make_profile(peak_mz=500.0, peak_intensity=2000.0)
         self.peaks = np.array([500.0])
-        _, self.peak_indices, _, _, self.starts, self.stops, self.offsets_arr = _prepare_lockmass(
-            self.mz_x, self.peaks
-        )
+        _, self.peak_indices, _, _, self.starts, self.stops, self.offsets_arr = _prepare_lockmass(self.mz_x, self.peaks)
 
     def test_zero_shift_when_peak_centred(self):
         out = np.zeros(1, dtype=np.float32)
         _nb_estimate_lockmass_shifts(
-            self.mz_y, self.starts, self.stops, self.peak_indices, self.offsets_arr,
-            False, out, 500.0, 250.0, 0.25,
+            self.mz_y,
+            self.starts,
+            self.stops,
+            self.peak_indices,
+            self.offsets_arr,
+            False,
+            out,
+            500.0,
+            250.0,
+            0.25,
         )
         assert out[0] == pytest.approx(0.0, abs=2)
 
@@ -173,16 +183,32 @@ class TestNbEstimateLockmassShifts:
         low_y = self.mz_y * 0.001
         out = np.zeros(1, dtype=np.float32)
         _nb_estimate_lockmass_shifts(
-            low_y, self.starts, self.stops, self.peak_indices, self.offsets_arr,
-            False, out, LOCKMASS_THRESHOLD, LOCKMASS_THRESHOLD * 0.5, 0.25,
+            low_y,
+            self.starts,
+            self.stops,
+            self.peak_indices,
+            self.offsets_arr,
+            False,
+            out,
+            LOCKMASS_THRESHOLD,
+            LOCKMASS_THRESHOLD * 0.5,
+            0.25,
         )
         assert np.all(out == 0.0)
 
     def test_weighted_true_accepted(self):
         out = np.zeros(1, dtype=np.float32)
         _nb_estimate_lockmass_shifts(
-            self.mz_y, self.starts, self.stops, self.peak_indices, self.offsets_arr,
-            True, out, 500.0, 250.0, 0.25,
+            self.mz_y,
+            self.starts,
+            self.stops,
+            self.peak_indices,
+            self.offsets_arr,
+            True,
+            out,
+            500.0,
+            250.0,
+            0.25,
         )
         assert out.shape == (1,)
 
@@ -190,6 +216,7 @@ class TestNbEstimateLockmassShifts:
 # ---------------------------------------------------------------------------
 # MaximumIntensityLockmassEstimator
 # ---------------------------------------------------------------------------
+
 
 class TestMaximumIntensityLockmassEstimator:
     def setup_method(self):
@@ -230,6 +257,7 @@ class TestMaximumIntensityLockmassEstimator:
 # ---------------------------------------------------------------------------
 # WeightedIntensityLockmassEstimator
 # ---------------------------------------------------------------------------
+
 
 class TestWeightedIntensityLockmassEstimator:
     def setup_method(self):

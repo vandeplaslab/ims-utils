@@ -40,8 +40,7 @@ class LockmassEstimator:
         self.peaks = np.sort(peaks)
         self.n_peaks = len(self.peaks)
 
-
-    def __call__(self, mz_y: np.ndarray,  **kwargs: ty.Any) -> np.ndarray:
+    def __call__(self, mz_y: np.ndarray, **kwargs: ty.Any) -> np.ndarray:
         """Estimate lockmass shifts for the given spectrum.
 
         Parameters
@@ -49,6 +48,9 @@ class LockmassEstimator:
         mz_y : np.ndarray
             Intensity values of the spectrum. This should be a profile mass spectrum with the same number
             of m/z values as used during initialization.
+        **kwargs: ty.Any
+            Additional keyword arguments for specific estimators. See individual estimator implementations
+            for details.
         """
         return self.estimate(mz_y, **kwargs)
 
@@ -60,6 +62,9 @@ class LockmassEstimator:
         mz_y : np.ndarray
             Intensity values of the spectrum. This should be a profile mass spectrum with the same number
             of m/z values as used during initialization.
+        **kwargs: ty.Any
+            Additional keyword arguments for specific estimators. See individual estimator implementations
+            for details.
         """
         raise NotImplementedError("Must implement method")
 
@@ -77,9 +82,7 @@ class LockmassEstimator:
         """
         return fast_roll(mz_y, shift)
 
-    def estimate_for_reader(
-        self, reader: BaseReader, weighted: bool = True, silent: bool = False
-    ) -> np.ndarray:
+    def estimate_for_reader(self, reader: BaseReader, weighted: bool = True, silent: bool = False) -> np.ndarray:
         """Estimate lockmass shifts for all spectra in the given reader.
 
         Parameters
@@ -121,9 +124,15 @@ class MaximumIntensityLockmassEstimator(LockmassEstimator):
         super().__init__(mz_x, peaks)
         self.window = window
 
-        self.mz_indices, self.peak_indices, self.masks, self.offsets, self._starts, self._stops, self._offsets_arr = (
-            _prepare_lockmass(mz_x, self.peaks, window)
-        )
+        (
+            self.mz_indices,
+            self.peak_indices,
+            self.masks,
+            self.offsets,
+            self._starts,
+            self._stops,
+            self._offsets_arr,
+        ) = _prepare_lockmass(mz_x, self.peaks, window)
 
     def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
         """Estimate lockmass shifts for the given spectrum.
@@ -165,9 +174,15 @@ class WeightedIntensityLockmassEstimator(LockmassEstimator):
         self.window = window
         self.centroid_frac = centroid_frac
 
-        self.mz_indices, self.peak_indices, self.masks, _, self._starts, self._stops, self._offsets_arr = (
-            _prepare_lockmass(mz_x, self.peaks, window)
-        )
+        (
+            self.mz_indices,
+            self.peak_indices,
+            self.masks,
+            _,
+            self._starts,
+            self._stops,
+            self._offsets_arr,
+        ) = _prepare_lockmass(mz_x, self.peaks, window)
         self.centroid_func = fast_parabolic_centroid
 
     def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
@@ -367,7 +382,7 @@ def _nb_estimate_lockmass_shifts(
 
         y = mz_y[s:e]
         win_threshold = np.mean(y) * centroid_frac
-        cx, cy = _nb_parabolic_centroid_window(y, s, win_threshold)
+        cx, _cy = _nb_parabolic_centroid_window(y, s, win_threshold)
 
         if np.isnan(cx):
             continue
@@ -375,10 +390,10 @@ def _nb_estimate_lockmass_shifts(
     return out
 
 
-
 def fast_roll(array: np.ndarray, num: int | float, fill_value: int | float = 0) -> np.ndarray:
-    """Shift 1d array to a new position with 0 padding to prevent wraparound - this function is actually
-    quicker than np.roll.
+    """Shift 1d array to a new position with 0 padding to prevent wraparound.
+
+    Function is actually quicker than np.roll.
 
     Parameters
     ----------
@@ -391,7 +406,7 @@ def fast_roll(array: np.ndarray, num: int | float, fill_value: int | float = 0) 
     """
     if not isinstance(num, (numbers.Integral, float, np.floating)):
         raise ValueError("`num` must be a numeric value")
-    num = int(round(num))
+    num = round(num)
 
     if num == 0:
         return array

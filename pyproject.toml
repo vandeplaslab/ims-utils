@@ -86,7 +86,9 @@ write_to = "src/ims_utils/_version.py"
 line-length = 120
 target-version = "py38"
 src = ["src"]
+
 # https://beta.ruff.rs/docs/rules/
+[tool.ruff.lint]
 extend-select = [
     "E",    # style errors
     "W",    # style warnings
@@ -116,9 +118,10 @@ extend-ignore = [
     "D416", # Section name should end with a colon
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/*.py" = ["D", "S"]
 "setup.py" = ["D"]
+"src/ims_utils/_vendored/**/*" = ["ALL"]
 
 # https://docs.pytest.org/en/6.2.x/customize.html
 [tool.pytest.ini_options]

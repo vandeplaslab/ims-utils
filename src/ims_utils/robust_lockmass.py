@@ -389,9 +389,7 @@ class RobustLockmassEstimator:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _find_candidates(
-        self, mz_y: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _find_candidates(self, mz_y: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Run the numba candidate finder and convert results to flat arrays.
 
         Returns
@@ -502,10 +500,7 @@ class RobustLockmassEstimator:
                 np.int64(self.max_iter),
             )
             if n_inliers >= self.min_inliers and not np.isnan(a):
-                inlier_mask = (
-                    np.abs(a * ref_mz_flat**2 + b * ref_mz_flat + c - obs_ppm_flat)
-                    < self.ransac_tol_ppm
-                )
+                inlier_mask = np.abs(a * ref_mz_flat**2 + b * ref_mz_flat + c - obs_ppm_flat) < self.ransac_tol_ppm
                 n_in = int(inlier_mask.sum())
                 poly_coeffs = np.polyfit(
                     ref_mz_flat[inlier_mask],
@@ -537,20 +532,12 @@ class RobustLockmassEstimator:
                         best_n = n_in
                         best_coeffs = np.array([slope, intercept])
                 if best_coeffs is not None and best_n >= self.min_inliers:
-                    inlier_mask = (
-                        np.abs(obs_ppm_flat - np.polyval(best_coeffs, ref_mz_flat))
-                        < self.ransac_tol_ppm
-                    )
-                    poly_coeffs = np.polyfit(
-                        ref_mz_flat[inlier_mask], obs_ppm_flat[inlier_mask], 1
-                    )
+                    inlier_mask = np.abs(obs_ppm_flat - np.polyval(best_coeffs, ref_mz_flat)) < self.ransac_tol_ppm
+                    poly_coeffs = np.polyfit(ref_mz_flat[inlier_mask], obs_ppm_flat[inlier_mask], 1)
                     return poly_coeffs, inlier_mask
             else:
                 poly_coeffs = np.polyfit(ref_mz_flat, obs_ppm_flat, 1)
-                inlier_mask = (
-                    np.abs(obs_ppm_flat - np.polyval(poly_coeffs, ref_mz_flat))
-                    < self.ransac_tol_ppm
-                )
+                inlier_mask = np.abs(obs_ppm_flat - np.polyval(poly_coeffs, ref_mz_flat)) < self.ransac_tol_ppm
                 if int(inlier_mask.sum()) >= self.min_inliers:
                     return poly_coeffs, inlier_mask
             effective_degree = 0
@@ -569,9 +556,7 @@ class RobustLockmassEstimator:
     # Public API
     # ------------------------------------------------------------------
 
-    def estimate(
-        self, mz_y: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, np.ndarray]:
+    def estimate(self, mz_y: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, np.ndarray]:
         """Estimate per-candidate ppm shifts and fit a robust polynomial model.
 
         Parameters
@@ -592,9 +577,7 @@ class RobustLockmassEstimator:
             Boolean mask indicating which candidates are RANSAC inliers.
         """
         ref_mz_flat, obs_ppm_flat, peak_starts, peak_counts = self._find_candidates(mz_y)
-        poly_coeffs, inlier_mask = self._fit_polynomial(
-            ref_mz_flat, obs_ppm_flat, peak_starts, peak_counts
-        )
+        poly_coeffs, inlier_mask = self._fit_polynomial(ref_mz_flat, obs_ppm_flat, peak_starts, peak_counts)
         return ref_mz_flat, obs_ppm_flat, poly_coeffs, inlier_mask
 
     def correct(self, mz_y: np.ndarray, fast: bool = True) -> np.ndarray:
@@ -636,7 +619,7 @@ class RobustLockmassEstimator:
             mz_mean = float(np.mean(self._ref_mz))
             shift_ppm = float(np.polyval(poly_coeffs, mz_mean))
             da_shift = shift_ppm * mz_mean / 1.0e6
-            index_shift = int(round(da_shift / self._mean_spacing))
+            index_shift = round(da_shift / self._mean_spacing)
             return fast_roll(mz_y, -index_shift)
 
         # Continuous warp: evaluate shift at every m/z point
@@ -645,9 +628,7 @@ class RobustLockmassEstimator:
         corrected = _nb_monotone_interp(src, self._mz_x_f64, mz_y.astype(np.float64))
         return corrected.astype(mz_y.dtype)
 
-    def correct_for_reader(
-        self, reader: ty.Any, fast: bool = True, silent: bool = False
-    ) -> list[np.ndarray]:
+    def correct_for_reader(self, reader: ty.Any, fast: bool = True, silent: bool = False) -> list[np.ndarray]:
         """Apply mass correction to all spectra in a reader.
 
         Parameters
@@ -669,6 +650,4 @@ class RobustLockmassEstimator:
             raise ValueError("reader must have n_pixels attribute")
         if not hasattr(reader, "spectra_iter"):
             raise ValueError("reader must have spectra_iter attribute")
-        return [
-            self.correct(mz_y, fast=fast) for _, mz_y in reader.spectra_iter(silent=silent)
-        ]
+        return [self.correct(mz_y, fast=fast) for _, mz_y in reader.spectra_iter(silent=silent)]

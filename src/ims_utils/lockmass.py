@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import numbers
 import typing as ty
+import warnings
 
 import numpy as np
 from koyo.utilities import find_nearest_index, get_array_mask
@@ -61,7 +63,7 @@ class LockmassEstimator:
         raise NotImplementedError("Must implement method")
 
     @staticmethod
-    def apply(mz_y: np.ndarray, shift: int) -> np.ndarray:
+    def apply(mz_y: np.ndarray, shift: int | float) -> np.ndarray:
         """Apply lockmass shift to the given spectrum.
 
         Parameters
@@ -69,12 +71,14 @@ class LockmassEstimator:
         mz_y : np.ndarray
             Intensity values of the spectrum. This should be a profile mass spectrum with the same number
             of m/z values as used during initialization.
-        shift: int
-            Shift value to apply.
+        shift: int | float
+            Shift value to apply. Float values are rounded to the nearest integer.
         """
         return fast_roll(mz_y, shift)
 
-    def estimate_for_reader(self, reader: BaseReader, weighted: bool = True) -> np.ndarray:
+    def estimate_for_reader(
+        self, reader: BaseReader, weighted: bool = True, silent: bool = False
+    ) -> np.ndarray:
         """Estimate lockmass shifts for all spectra in the given reader.
 
         Parameters
@@ -84,6 +88,8 @@ class LockmassEstimator:
             and support indexing to get individual spectra.
         weighted: bool
             Whether to use weighted distance for peak selection.
+        silent: bool
+            Whether to suppress progress output from the reader iterator.
         """
         if not hasattr(reader, "n_pixels"):
             raise ValueError("reader must have n_pixels attribute")
@@ -91,7 +97,7 @@ class LockmassEstimator:
             raise ValueError("reader must have spectra_iter attribute")
         n_spectra = reader.n_pixels
         shifts = np.zeros((n_spectra, self.n_peaks), dtype=np.float32)
-        for i, (_mz_x, mz_y) in enumerate(reader.spectra_iter(silent=False)):
+        for i, (_mz_x, mz_y) in enumerate(reader.spectra_iter(silent=silent)):
             self.estimate(mz_y, weighted=weighted, out=shifts[i])
         return shifts
 
@@ -125,18 +131,19 @@ class MaximumIntensityLockmassEstimator(LockmassEstimator):
             Intensity values of the spectrum. This should be a profile mass spectrum with the same number
             of m/z values as used during initialization.
         weighted: bool
-            Whether to use weighted distance for peak selection.
+            Accepted for API compatibility but not used by this estimator; peak is located by
+            maximum intensity only.
         out: np.ndarray | None
             Output array to store the results. If None, a new array will be created.
         """
         out = np.zeros(self.n_peaks, dtype=np.float32) if out is None else out
         return _estimate_lockmass_maximum(mz_y, self.masks, self.offsets, out)
-    
+
+
 class WeightedIntensityLockmassEstimator(LockmassEstimator):
     """Weighted intensity lockmass estimator."""
-    
-    
-    def __init__(self, mz_x: np.ndarray, peaks: np.ndarray, window: float = 0.1):
+
+    def __init__(self, mz_x: np.ndarray, peaks: np.ndarray, window: float = 0.1, centroid_frac: float = 0.25):
         """Initialize lockmass estimator.
 
         Parameters
@@ -147,13 +154,17 @@ class WeightedIntensityLockmassEstimator(LockmassEstimator):
             List of lockmass peaks to use for estimation.
         window: float
             Window size for lockmass peak detection.
+        centroid_frac: float
+            Fraction of the mean intensity within a peak window used as the centroid peak threshold.
+            Peaks below ``mean(y) * centroid_frac`` are ignored during centroid estimation.
         """
         super().__init__(mz_x, peaks)
         self.window = window
+        self.centroid_frac = centroid_frac
 
         self.mz_indices, self.peak_indices, self.masks, _ = _prepare_lockmass(mz_x, self.peaks, window)
         self.centroid_func = fast_parabolic_centroid
-    
+
     def estimate(self, mz_y: np.ndarray, weighted: bool = True, out: np.ndarray | None = None) -> np.ndarray:
         """Estimate lockmass shifts for the given spectrum.
 
@@ -169,7 +180,8 @@ class WeightedIntensityLockmassEstimator(LockmassEstimator):
         """
         out = np.zeros(self.n_peaks, dtype=np.float32) if out is None else out
         return _estimate_lockmass_shifts(
-            mz_y, self.centroid_func, self.mz_indices, self.peak_indices, self.masks, weighted, out
+            mz_y, self.centroid_func, self.mz_indices, self.peak_indices, self.masks, weighted, out,
+            centroid_frac=self.centroid_frac,
         )
 
 
@@ -207,6 +219,7 @@ def _estimate_lockmass_shifts(
     out: np.ndarray | None = None,
     threshold: float = LOCKMASS_THRESHOLD,
     individual_frac: float = 0.5,
+    centroid_frac: float = 0.25,
 ) -> np.ndarray:
     out = np.zeros(peak_indices.size, dtype=np.float32) if out is None else out
     individual_threshold = individual_frac * threshold
@@ -214,6 +227,11 @@ def _estimate_lockmass_shifts(
     # first, check whether the spectrum has enough intensities
     intensities = [np.max(mz_y[mask]) for mask in masks.values()]
     if np.max(intensities) < threshold:
+        warnings.warn(
+            "Spectrum intensities are below the lockmass threshold; returning zero shifts.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return out
 
     for j, (_peak, mask) in enumerate(masks.items()):
@@ -223,7 +241,7 @@ def _estimate_lockmass_shifts(
         # get mass spectrum subset
         y = mz_y[mask]
         # generate centroid from the subset spectrum
-        cx, cy = centroid_func(mz_indices[mask], y, np.mean(y) * 0.25)
+        cx, cy = centroid_func(mz_indices[mask], y, np.mean(y) * centroid_frac)
 
         # if the centroid is empty, skip
         n = len(cx)
@@ -234,7 +252,8 @@ def _estimate_lockmass_shifts(
             select = np.argsort(cy)[-10:]
             cx, cy = cx[select], cy[select]
         if weighted:
-            sort = np.lexsort((cy, np.abs(cx - index)))
+            # sort by distance (ascending) then by intensity (descending) as tiebreaker
+            sort = np.lexsort((-cy, np.abs(cx - index)))
         else:
             sort = np.argsort(np.abs(cx - index))
         # calculate actual shift value for particular peak
@@ -242,7 +261,7 @@ def _estimate_lockmass_shifts(
     return out
 
 
-def fast_roll(array: np.ndarray, num: int, fill_value: int | float = 0) -> np.ndarray:
+def fast_roll(array: np.ndarray, num: int | float, fill_value: int | float = 0) -> np.ndarray:
     """Shift 1d array to a new position with 0 padding to prevent wraparound - this function is actually
     quicker than np.roll.
 
@@ -250,18 +269,19 @@ def fast_roll(array: np.ndarray, num: int, fill_value: int | float = 0) -> np.nd
     ----------
     array : np.ndarray
         array to be shifted
-    num : int
-        value by which the array should be shifted
+    num : int | float
+        value by which the array should be shifted. Float values are rounded to the nearest integer.
     fill_value : Union[float, int]
         value to fill in the areas where wraparound would have happened
     """
+    if not isinstance(num, (numbers.Integral, float, np.floating)):
+        raise ValueError("`num` must be a numeric value")
+    num = int(round(num))
+
     if num == 0:
         return array
 
     result = np.empty_like(array)
-    if not isinstance(num, int):
-        raise ValueError("`num` must be an integer")
-
     if num > 0:
         result[:num] = fill_value
         result[num:] = array[:-num]

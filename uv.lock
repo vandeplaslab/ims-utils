@@ -546,9 +546,6 @@ dependencies = [
     { name = "numba" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pandas" },
-    { name = "patsy" },
-    { name = "scikit-learn" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.16.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "tqdm" },
@@ -582,11 +579,6 @@ test = [
     { name = "pytest-pretty" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "ims-utils", extras = ["test"], marker = "extra == 'dev'" },
@@ -598,9 +590,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numba" },
     { name = "numpy" },
-    { name = "pandas", specifier = ">=2.3.2" },
     { name = "pandas", marker = "extra == 'batch'", specifier = ">=2.2,<4" },
-    { name = "patsy", specifier = ">=1.0.1" },
     { name = "patsy", marker = "extra == 'batch'" },
     { name = "pdbpp", marker = "extra == 'dev'" },
     { name = "plotly", marker = "extra == 'html'" },

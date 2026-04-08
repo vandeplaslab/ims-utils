@@ -57,7 +57,11 @@ batch = [
     "mpire",
     "patsy",
 ]
-test = ["pytest>=6.0", "pytest-cov", "pytest-pretty"]
+test = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "pytest-pretty"
+]
 dev = [
     "ipython",
     "mypy",
@@ -66,6 +70,31 @@ dev = [
     "rich",
     "ruff",
     "ims_utils[test]",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "pytest-pretty"
+]
+dev = [
+    { include-group = "test" },
+    "ipython",
+    "mypy",
+    "pdbpp",
+    "pre-commit",
+    "rich",
+    "ruff",
+    "check-manifest",
+]
+docs = [
+    "ims-utils[html,oms,batch]",
+    "mkdocs-macros-plugin>=1.3.9",
+    "mkdocs-material>=9.6.20",
+    "mkdocstrings>=0.30.0",
+    "mkdocstrings-python>=1.18.2",
+    "mkdocs-video>=1.5.0",
 ]
 
 [project.urls]
@@ -169,6 +198,10 @@ exclude_lines = [
 
 [tool.coverage.run]
 source = ["ims_utils"]
+relative_files = true
+omit = [
+    "**/*_version.py"
+]
 
 # https://github.com/mgedmin/check-manifest#configuration
 [tool.check-manifest]
@@ -181,21 +214,6 @@ ignore = [
     "_version.py",
     "*venv/**/*",
     "uv.lock",
+    ".claude/*",
+    "scripts/**/*",
 ]
-
-[dependency-groups]
-dev = [
-    "pytest>=8.4.2",
-]
-
-# # for things that require compilation
-# # https://cibuildwheel.readthedocs.io/en/stable/options/
-# [tool.cibuildwheel]
-# # Skip 32-bit builds & PyPy wheels on all platforms
-# skip = ["*-manylinux_i686", "*-musllinux_i686", "*-win32", "pp*"]
-# test-extras = ["test"]
-# test-command = "pytest {project}/tests -v"
-# test-skip = "*-musllinux*"
-
-# [tool.cibuildwheel.environment]
-# HATCH_BUILD_HOOKS_ENABLE = "1"

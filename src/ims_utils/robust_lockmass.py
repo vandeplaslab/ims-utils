@@ -150,7 +150,7 @@ def _nb_monotone_interp(
     """
     N = len(src)
     M = len(xp)
-    out = np.empty(N, dtype=nb.float64)
+    out = np.empty(N, dtype=np.float64)
     j = 0
 
     for i in range(N):

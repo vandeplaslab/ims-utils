@@ -601,11 +601,15 @@ requires-dist = [
     { name = "pytest-pretty", marker = "extra == 'test'" },
     { name = "rich", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
+    { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "scikit-learn", marker = "extra == 'batch'" },
     { name = "scipy" },
     { name = "tqdm" },
 ]
 provides-extras = ["html", "oms", "batch", "test", "dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.4.2" }]
 
 [[package]]
 name = "iniconfig"

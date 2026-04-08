@@ -78,6 +78,8 @@ jobs:
 
       - name: Coverage
         uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   deploy_testpypi:
     name: Deploy to TestPyPI

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import numba
+import numba as nb
 import numpy as np
 from tqdm import tqdm
 
 
-@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
+@nb.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def _nanmedian_1d(arr: np.ndarray) -> float:
     """Compute median of a 1D array ignoring NaNs."""
     filtered = arr[~np.isnan(arr)]
@@ -21,23 +21,23 @@ def _nanmedian_1d(arr: np.ndarray) -> float:
     return (filtered[mid - 1] + filtered[mid]) / 2.0
 
 
-@numba.njit(parallel=True, fastmath=True, cache=True)  # type: ignore[misc]
+@nb.njit(parallel=True, fastmath=True, cache=True)  # type: ignore[misc]
 def _nanmedian_axis0(x: np.ndarray) -> np.ndarray:
     """Compute nanmedian along axis=0 (per column) of a 2D array in parallel."""
     _n_rows, n_cols = x.shape
-    result = np.empty(n_cols, dtype=numba.float32)
-    for j in numba.prange(n_cols):
+    result = np.empty(n_cols, dtype=np.float32)
+    for j in nb.prange(n_cols):
         col = x[:, j]
         result[j] = _nanmedian_1d(col)
     return result
 
 
-@numba.njit(parallel=True, fastmath=True, cache=True)  # type: ignore[misc]
+@nb.njit(parallel=True, fastmath=True, cache=True)  # type: ignore[misc]
 def _nanmedian_axis1(x: np.ndarray) -> np.ndarray:
     """Compute nanmedian along axis=1 (per row) of a 2D array in parallel."""
     n_rows, _n_cols = x.shape
-    result = np.empty(n_rows, dtype=numba.float32)
-    for i in numba.prange(n_rows):
+    result = np.empty(n_rows, dtype=np.float32)
+    for i in nb.prange(n_rows):
         row = x[i, :]
         result[i] = _nanmedian_1d(row)
     return result

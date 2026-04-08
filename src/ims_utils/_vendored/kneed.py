@@ -149,7 +149,7 @@ class KneeLocator:
                 "This could be due to bad clustering, no "
                 "actual clusters being formed etc."
             )
-            warnings.warn(warning_message, Warning)
+            warnings.warn(warning_message, Warning, stacklevel=2)
             self.knee = None
             self.norm_knee = None
             self.knee_y = None
@@ -189,7 +189,7 @@ class KneeLocator:
                 "This could be due to bad clustering, no "
                 "actual clusters being formed etc."
             )
-            warnings.warn(warning_message, Warning)
+            warnings.warn(warning_message, Warning, stacklevel=2)
             return None, None
 
         # placeholder for which threshold region i is located in.
@@ -261,7 +261,7 @@ class KneeLocator:
         ax.vlines(self.knee, plt.ylim()[0], plt.ylim()[1])
         ax.set_xlabel(x_label, fontsize=14)
         ax.set_ylabel(y_label, fontsize=14)
-        ax.set_title("KneeLocator: Knee Point Detection\nBest Knee: {}".format(self.knee))
+        ax.set_title(f"KneeLocator: Knee Point Detection\nBest Knee: {self.knee}")
         return fig
 
     def plot_knee_normalized(self, x_label: str = "k", y_label: str = "metric") -> plt.Figure:
@@ -277,7 +277,7 @@ class KneeLocator:
         ax.vlines(self.norm_knee, plt.ylim()[0], plt.ylim()[1])
         ax.set_xlabel(x_label, fontsize=14)
         ax.set_ylabel(y_label, fontsize=14)
-        ax.set_title("KneeLocator: Knee Point Detection\nBest Knee: {}".format(self.norm_knee))
+        ax.set_title(f"KneeLocator: Knee Point Detection\nBest Knee: {self.norm_knee}")
         return fig
 
     # Niceties for users working with elbows rather than knees

@@ -16,24 +16,24 @@ FORMULA_TO_REF = {
 
 
 def calculate_kendrick_mass_defect(mzs: np.ndarray, ref: str | float) -> tuple[np.ndarray, np.ndarray]:
-    """Calculate KM and KMD for specified formula"""
+    """Calculate KM and KMD for specified formula."""
     if ref not in FORMULA_TO_REF:
         raise ValueError(f"Unknown formula: {ref}")
     if isinstance(ref, str):
         ref = FORMULA_TO_REF[ref]
-    part, nominal = np.modf(ref)
+    _part, nominal = np.modf(ref)
 
     # calculate kendrick mass
     km = mzs * (nominal / ref)
 
     # calculate kendrick mass defect
-    km_part, km_nominal = np.modf(km)
+    _km_part, km_nominal = np.modf(km)
     kmd = km_nominal - km
     return km, kmd
 
 
 def calculate_mass_defect(mzs: np.ndarray) -> np.ndarray:
-    """Calculate mass defect for specified m/z values"""
+    """Calculate mass defect for specified m/z values."""
     part, _ = np.modf(mzs)
     return part
 
@@ -41,7 +41,7 @@ def calculate_mass_defect(mzs: np.ndarray) -> np.ndarray:
 def filter_by_rules(
     df: pd.DataFrame, filter_regions: list[tuple[float, float, float, float]], select: bool = False
 ) -> pd.DataFrame:
-    """Filter dataframe based on specified rules"""
+    """Filter dataframe based on specified rules."""
     mask = np.any(
         [
             (df.mzs >= region[0]) & (df.mzs <= region[1]) & (df.kmd <= region[2]) & (df.kmd >= region[3])

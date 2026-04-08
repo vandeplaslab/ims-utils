@@ -13,7 +13,7 @@ def test_centroid_to_profile() -> None:
     intensities = np.array([10, 20, 30], dtype=np.float32)
 
     # Convert to profile
-    profile_mzs, profile_intensities, sigma = centroid_to_profile(
+    profile_mzs, profile_intensities, _sigma = centroid_to_profile(
         mzs, intensities, resolving_power=10000, mz_min=50, mz_max=400
     )
 
@@ -44,7 +44,7 @@ def test_centroid_to_profile_with_ppm() -> None:
     ppm_axis = get_ppm_axis(50, 350, 0.1)
 
     # Convert to profile
-    profile_mzs, profile_intensities, sigma = centroid_to_profile(
+    profile_mzs, profile_intensities, _sigma = centroid_to_profile(
         mzs, intensities, resolving_power=10000, mz_grid=ppm_axis
     )
 

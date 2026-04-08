@@ -10,9 +10,7 @@ It is a pretty good wavelet-based peak picker that should be useful for DT peak 
 # -*- coding: utf-8 -*-
 # __author__ lukasz.g.migas
 
-
 from collections import deque
-
 
 import numpy as np
 from scipy.signal import fftconvolve

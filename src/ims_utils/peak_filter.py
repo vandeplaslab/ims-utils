@@ -67,6 +67,7 @@ class PeakFilter:
                 self.mzs, tolerance=mz_tol, ppm=mz_ppm, keep_singletons=True, max_in_group=max_in_group
             )
             self._indices_by_mz = filter_groups(groups, self.intensities)
+            self._groups_by_mz = groups
             n = len(self.mzs) - len(self._indices_by_mz)
         logger.trace(
             f"[MZ] Found {len(self._indices_by_mz)} groups (reduction of {n}) in {timer()} (tol={mz_tol}; ppm={mz_ppm})"
@@ -87,6 +88,7 @@ class PeakFilter:
         with MeasureTimer() as timer:
             groups = find_groups_within_bounds(self.mzs, tolerance=mz_tol, ppm=mz_ppm, keep_singletons=True, distance=0)
             self._indices_by_mz_merge = filter_groups(groups, self.intensities)
+            self._groups_by_mz_merge = groups
             n = len(self.mzs) - len(self._indices_by_mz_merge)
         logger.trace(
             f"[MERGE] Found {len(self._indices_by_mz_merge)} groups (reduction of {n}) in {timer()} (tol={mz_tol};"

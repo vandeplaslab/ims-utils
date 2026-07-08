@@ -14,20 +14,61 @@ def noop_logger(msg: str) -> None:
 
 
 def get_best_snr(data: list[tuple[int, float, int]]) -> tuple[int, float, int]:
-    """Calculate best SNR using the Knee method often used in K-Means clustering."""
+    """Calculate the best SNR using the Knee method.
+
+    Expects data as tuples of:
+
+        (snr, something, score)
+
+    The knee is found using snr as x and score as y. If no knee can be found,
+    the function falls back to the row with the highest score.
+    """
     from ims_utils._vendored.kneed import KneeLocator
 
-    # convert data to numpy array
-    res = np.asarray(data)
-    # check if there is a plateau at the end and if so, let's remove the last plateau
-    max_value = res[:, 2].max()
-    while res[-1, 2] == max_value:
-        res = res[:-1]
+    res = np.asarray(data, dtype=float)
 
-    # using knee locator to find the best SNR
-    knee = KneeLocator(res[:, 0], res[:, 2], curve_nature="convex", curve_direction="increasing")
-    best = int(knee.knee)
-    return data[best]
+    if res.ndim != 2 or res.shape[0] == 0 or res.shape[1] < 3:
+        raise ValueError("data must be a non-empty list of tuples with at least 3 values")
+
+    x = res[:, 0]
+    y = res[:, 2]
+
+    # Remove trailing plateau, but never remove all points.
+    max_value = np.max(y)
+
+    keep_until = len(res)
+    while keep_until > 1 and y[keep_until - 1] == max_value:
+        keep_until -= 1
+
+    # If removing the plateau would leave too few points, keep the original data.
+    if keep_until >= 2:
+        res_trimmed = res[:keep_until]
+    else:
+        res_trimmed = res
+
+    x_trimmed = res_trimmed[:, 0]
+    y_trimmed = res_trimmed[:, 2]
+
+    # KneeLocator needs at least a few points to behave sensibly.
+    if len(res_trimmed) < 3:
+        best_idx = int(np.argmax(y))
+        return data[best_idx]
+
+    knee = KneeLocator(
+        x_trimmed,
+        y_trimmed,
+        curve_nature="convex",
+        curve_direction="increasing",
+    )
+
+    if knee.knee is None:
+        best_idx = int(np.argmax(y))
+        return data[best_idx]
+
+    # knee.knee is an x-value, not necessarily an array/list index.
+    best_idx = int(np.argmin(np.abs(x - knee.knee)))
+
+    return data[best_idx]
 
 
 def decreasing_step_size(
@@ -61,8 +102,10 @@ def optimize_oms_centroid(
         for i, (snr, (px, _py)) in enumerate(peaks.items()):
             res.append((i, snr, len(px)))
 
-        best = get_best_snr(res)
-        _, best_snr, _ = best
+        try:
+            _, best_snr, _ = get_best_snr(res)
+        except IndexError:
+            best_snr = 0
         px, py = peaks[best_snr]
     logger(f"Best SNR: {best_snr:.4f} - Found {len(px):,} peaks in {timer()}.")
     return float(best_snr), px, py

@@ -23,6 +23,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from ims_utils.batchnorm.utilities import (
+    _one_hot_encode,
     compute_init_values_parametric,
     compute_values_non_parametric,
     compute_weights,
@@ -31,6 +32,21 @@ from ims_utils.batchnorm.utilities import (
 
 if not is_installed("patsy"):
     raise ImportError("scikit-learn is required for this module.")
+
+
+def _labels_to_one_hot(batches) -> np.ndarray:
+    """Convert a batch label array/Series to a float64 one-hot matrix.
+
+    Columns are ordered by ``np.unique`` (i.e. sorted), matching
+    ``pd.get_dummies(batches.astype(str)).values`` when batch labels are
+    already stringified in sort order.
+    """
+    if isinstance(batches, pd.Series):
+        labels = batches.values.astype(str)
+    else:
+        labels = np.asarray(batches).astype(str)
+    _, _, design = _one_hot_encode(labels)
+    return design  # float64[n_obs, n_batches]
 
 
 def recombat(array: np.ndarray, batches: np.ndarray, key: str = "batch", **kwargs):
@@ -58,7 +74,7 @@ class ReComBat:
         The default is 1e-4.
     max_iter : int, optional
         The maximum number of steps of the parametric empirical Bayes optimization.
-        The detault is 1000.
+        The default is 1000.
     n_jobs : int, optional
         The number of parallel threads in the non-parametric optimization.
         If not given, then this is set to the number of cpus.
@@ -147,7 +163,7 @@ class ReComBat:
             if num_batches == 1:
                 raise ValueError("There should be at least two batches in the dataset.")
 
-            batches_one_hot = pd.get_dummies(batches.astype(str)).values
+            batches_one_hot = _labels_to_one_hot(batches)
 
             if np.any(batches_one_hot.sum(axis=0) == 1):
                 raise ValueError("There should be at least two values for each batch.")
@@ -196,7 +212,7 @@ class ReComBat:
             batches = pd.Series(batches, name="batches")
 
         with MeasureTimer(func=logger.debug, msg="Transformed reComBat in {}"):
-            batches_one_hot = pd.get_dummies(batches.astype(str)).values
+            batches_one_hot = _labels_to_one_hot(batches)
             if not self.is_fitted:
                 raise AttributeError("reComBat has not been fitted yet.")
             if data.shape[1] != self.alpha_.shape[1]:
@@ -323,11 +339,11 @@ class ReComBat:
         self.delta_star_squared_hat_ = delta_star_squared
 
     def _adjust_data(self, array, batches_one_hot):
-        """Perform the final adjustment step."""
-        tmp = np.zeros_like(array, dtype=np.float32)
-        for i in range(batches_one_hot.shape[1]):
-            tmp[batches_one_hot[:, i] == 1] = (array[batches_one_hot[:, i] == 1] - self.gamma_star_hat_[i]) / np.sqrt(
-                self.delta_star_squared_hat_[i]
-            )
-        tmp = np.sqrt(self.sigma_.astype(np.float32)) * tmp + self.alpha_.astype(np.float32)
+        """Perform the final adjustment step (vectorized)."""
+        # Map each sample to its batch index via argmax of the one-hot rows
+        batch_idx = batches_one_hot.argmax(axis=1)  # (n_obs,)
+        gamma = self.gamma_star_hat_[batch_idx]  # (n_obs, n_genes)
+        delta_sq = self.delta_star_squared_hat_[batch_idx]  # (n_obs, n_genes)
+        tmp = (array - gamma) / np.sqrt(delta_sq)
+        tmp = np.sqrt(self.sigma_.astype(np.float32)) * tmp.astype(np.float32) + self.alpha_.astype(np.float32)
         return tmp.astype(np.float32)

@@ -34,7 +34,7 @@ def test_calculate_mean_inter_normalization():
     assert scales.max() == 4.0
 
 
-def calculate_median_inter_normalization():
+def test_calculate_median_inter_normalization():
     """Test calculate_mfc_inter_normalization"""
     names, scales = calculate_median_inter_normalization(DATA_2D)
     assert len(names) == 3
@@ -43,7 +43,7 @@ def calculate_median_inter_normalization():
     assert scales.max() == 4.0
 
 
-def calculate_tic_inter_normalization():
+def test_calculate_tic_inter_normalization():
     """Test calculate_mfc_inter_normalization"""
     names, scales = calculate_tic_inter_normalization(DATA_1D)
     assert len(names) == 3

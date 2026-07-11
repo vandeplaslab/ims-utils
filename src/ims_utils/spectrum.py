@@ -8,7 +8,7 @@ import warnings
 from bisect import bisect_left, bisect_right
 from contextlib import suppress
 
-import numba
+import numba as nb
 import numpy as np
 from koyo.typing import SimpleArrayLike
 from koyo.utilities import find_nearest_index, find_nearest_index_batch
@@ -475,7 +475,7 @@ def fast_find_peaks(y: np.ndarray, height: float = 0) -> np.ndarray:
     return peaks  # type: ignore[no-any-return]
 
 
-@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
+@nb.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def _local_maxima_1d(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Find local maxima in a 1D array.
@@ -523,7 +523,7 @@ def _local_maxima_1d(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     return midpoints[:m], left_edges[:m], right_edges[:m]
 
 
-@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
+@nb.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def find_maximum(
     mz_array: np.ndarray, int_array: np.ndarray, centroid_x: np.ndarray, mask: np.ndarray, weighted_bins: int
 ) -> np.ndarray:
@@ -742,26 +742,26 @@ def get_ppm_axis(mz_start: float, mz_end: float, ppm: float):
     return mz
 
 
-@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
+@nb.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between(data: SimpleArrayLike, min_value: float, max_value: float):
     """Find indices between windows."""
     return np.where(np.logical_and(data >= min_value, data <= max_value))[0]
 
 
-@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
+@nb.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between_tol(data: np.ndarray, value: float, tol: float):
     """Find indices between window and ppm."""
     return find_between(data, value - tol, value + tol)
 
 
-@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
+@nb.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between_ppm(data: np.ndarray, value: float, ppm: float):
     """Find indices between window and ppm."""
     window = get_window_for_ppm(value, abs(ppm))
     return find_between(data, value - window, value + window)
 
 
-@numba.njit(cache=True, fastmath=True)  # type: ignore[misc]
+@nb.njit(cache=True, fastmath=True)  # type: ignore[misc]
 def find_between_batch(array: np.ndarray, min_value: np.ndarray, max_value: np.ndarray):
     """Find indices between specified boundaries for many items."""
     min_indices = np.searchsorted(array, min_value, side="left")
@@ -774,7 +774,7 @@ def find_between_batch(array: np.ndarray, min_value: np.ndarray, max_value: np.n
     return res
 
 
-@numba.njit(fastmath=True, cache=True)
+@nb.njit(fastmath=True, cache=True)
 def get_window_for_ppm(mz: float, ppm: float, scale: float = 1e-7) -> float:
     """Calculate window size for specified peak at specified ppm."""
     step = mz * scale  # calculate appropriate step size for specified mz value
@@ -846,7 +846,7 @@ def cluster_within_ppm(array: np.ndarray, ppm: float):
     return groups
 
 
-@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
+@nb.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def ppm_to_delta_mass(mz: float | np.ndarray, ppm: float | np.ndarray) -> float | np.ndarray:
     """Converts a ppm error range to a delta mass in th (da?).
 
@@ -864,7 +864,7 @@ def ppm_to_delta_mass(mz: float | np.ndarray, ppm: float | np.ndarray) -> float 
     return ppm * mz / 1_000_000.0
 
 
-@numba.njit(fastmath=True, cache=True)  # type: ignore[misc]
+@nb.njit(fastmath=True, cache=True)  # type: ignore[misc]
 def ppm_error(measured_mz: float | np.ndarray, theoretical_mz: float | np.ndarray) -> float | np.ndarray:
     """Calculate ppm error."""
     return ((measured_mz - theoretical_mz) / theoretical_mz) * 1e6
@@ -937,14 +937,14 @@ def bisect_spectrum(x_spectrum: np.ndarray, mz_value: np.ndarray, tol: float) ->
     return ix_l, ix_u
 
 
-@numba.njit()  # type: ignore[misc]
+@nb.njit()  # type: ignore[misc]
 def trim_axis(x: np.ndarray, y: np.ndarray, min_val: float, max_val: float) -> tuple[np.ndarray, np.ndarray]:
     """Trim axis to prevent accumulation of edges."""
     mask = np.where((x >= min_val) & (x <= max_val))
     return x[mask], y[mask]
 
 
-@numba.njit()  # type: ignore[misc]
+@nb.njit()  # type: ignore[misc]
 def set_ppm_axis(mz_x: np.ndarray, mz_y: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Set values for axis."""
     mz_idx = np.digitize(x, mz_x, True)

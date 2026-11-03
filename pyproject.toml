@@ -213,4 +213,5 @@ ignore = [
     "uv.lock",
     ".claude/*",
     "scripts/**/*",
+    "CLAUDE.md",
 ]

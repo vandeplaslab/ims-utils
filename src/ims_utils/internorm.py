@@ -2,8 +2,45 @@
 
 from __future__ import annotations
 
+import numba as nb
 import numpy as np
 from tqdm import tqdm
+
+
+@nb.njit(fastmath=True, cache=True)  # type: ignore[misc]
+def _nanmedian_1d(arr: np.ndarray) -> float:
+    """Compute median of a 1D array ignoring NaNs."""
+    filtered = arr[~np.isnan(arr)]
+    n = len(filtered)
+    if n == 0:
+        return np.nan
+    filtered = np.sort(filtered)
+    mid = n // 2
+    if n % 2 == 1:
+        return filtered[mid]
+    return (filtered[mid - 1] + filtered[mid]) / 2.0
+
+
+@nb.njit(parallel=True, fastmath=True, cache=True)  # type: ignore[misc]
+def _nanmedian_axis0(x: np.ndarray) -> np.ndarray:
+    """Compute nanmedian along axis=0 (per column) of a 2D array in parallel."""
+    _n_rows, n_cols = x.shape
+    result = np.empty(n_cols, dtype=np.float32)
+    for j in nb.prange(n_cols):
+        col = x[:, j]
+        result[j] = _nanmedian_1d(col)
+    return result
+
+
+@nb.njit(parallel=True, fastmath=True, cache=True)  # type: ignore[misc]
+def _nanmedian_axis1(x: np.ndarray) -> np.ndarray:
+    """Compute nanmedian along axis=1 (per row) of a 2D array in parallel."""
+    n_rows, _n_cols = x.shape
+    result = np.empty(n_rows, dtype=np.float32)
+    for i in nb.prange(n_rows):
+        row = x[i, :]
+        result[i] = _nanmedian_1d(row)
+    return result
 
 
 class CentroidMeanFoldInterNorm:
@@ -66,20 +103,19 @@ def calculate_mfc_inter_normalization(centroids: dict[str, np.ndarray]) -> tuple
 
 def _get_mean_fold_change(centroid: np.ndarray) -> np.ndarray:
     """Get scaling factors based on median values."""
-    # Compute the median while handling NaNs
-    centroid_ref = np.nanmedian(centroid, axis=0) if np.isnan(centroid).any() else np.median(centroid, axis=0)
-    centroid_ref = centroid_ref.astype(np.float32)
-    # Replace zeros with NaNs
+    centroid_ref = _nanmedian_axis0(np.asarray(centroid, dtype=np.float32))
     centroid_ref[centroid_ref == 0] = np.nan
     return centroid_ref.reshape(1, -1)  # Ensure it remains 2D
 
 
 def _mean_fold_change(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Calculate median fold change value."""
-    centroids_ref = np.nanmedian(x, axis=0)
+    x_f32 = np.asarray(x, dtype=np.float32)
+    centroids_ref = _nanmedian_axis0(x_f32)
     centroids_ref[centroids_ref == 0] = np.nan
-    scaling_factors = np.nanmedian(x / centroids_ref, axis=1)
-    return scaling_factors.astype(np.float32), centroids_ref.astype(np.float32)
+    fold = x_f32 / centroids_ref
+    scaling_factors = _nanmedian_axis1(fold)
+    return scaling_factors, centroids_ref
 
 
 def _get_internorm_scales(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

@@ -11,6 +11,7 @@ from ims_utils.lockmass import (
     WeightedIntensityLockmassEstimator,
     _nb_estimate_lockmass_maximum,
     _nb_estimate_lockmass_shifts,
+    _nb_parabolic_centroid_window,
     _prepare_lockmass,
     fast_roll,
 )
@@ -18,6 +19,13 @@ from ims_utils.lockmass import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def test_centroid_window_selects_peak_nearest_center() -> None:
+    signal = np.array([0.0, 5.0, 0.0, 0.0, 3.0, 0.0, 0.0, 2.0, 0.0])
+    position, intensity = _nb_parabolic_centroid_window(signal, 0, 0.1)
+    assert position == pytest.approx(4.0)
+    assert intensity == pytest.approx(3.0)
 
 
 def _make_profile(n: int = 1000, peak_mz: float = 500.0, window: float = 0.5, peak_intensity: float = 2000.0):

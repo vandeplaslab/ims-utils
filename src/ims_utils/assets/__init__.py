@@ -6,7 +6,7 @@ from pathlib import Path
 
 from koyo.system import get_module_path
 
-HERE = Path(get_module_path("spec_utils.assets", "__init__.py")).parent.resolve()
+HERE = Path(get_module_path("ims_utils.assets", "__init__.py")).parent.resolve()
 
 
 def get_matrix_tables() -> list[Path]:

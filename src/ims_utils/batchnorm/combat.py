@@ -13,13 +13,32 @@ from scipy.sparse import issparse
 
 
 class ComBat:
-    """ComBat algorithm."""
+    """Estimator wrapper for empirical Bayes ComBat batch correction.
+
+    Parameters
+    ----------
+    key : str
+        Name assigned to the batch annotation column when fitting.
+    """
 
     def __init__(self, key: str = "batches"):
         self.key = key
 
     def fit_transform(self, array: np.ndarray, batches: np.ndarray) -> np.ndarray:
-        """Fit and transform."""
+        """Correct batch effects in a samples-by-features array.
+
+        Parameters
+        ----------
+        array : np.ndarray
+            Dense or sparse data shaped ``(samples, features)``.
+        batches : np.ndarray
+            One batch label per sample.
+
+        Returns
+        -------
+        np.ndarray
+            Corrected dense array with the same shape and sample order.
+        """
         return combat(array, batches, key=self.key)
 
 
@@ -27,12 +46,10 @@ def combat(
     array: np.ndarray,
     batches: np.ndarray | pd.Series,
     key: str = "batches",
-) -> np.ndarray | np.ndarray | None:
-    """
-    ComBat function for batch effect correction [Johnson07]_ [Leek12]_
-    [Pedersen12]_.
-    Corrects for batch effects by fitting linear models, gains statistical power
-    via an EB framework where information is borrowed across genes.
+) -> np.ndarray | None:
+    """Correct batch effects with the ComBat empirical Bayes method [Johnson07]_ [Leek12]_ [Pedersen12]_.
+
+    This implementation fits linear models and borrows information across features.
     This uses the implementation `combat.py`_ [Pedersen12]_.
     .. _combat.py: https://github.com/brentp/combat.py.
 
@@ -44,6 +61,11 @@ def combat(
         Array with batch information where each row corresponds to a sample index.
     key : str, optional
         Key of batch information.
+
+    Notes
+    -----
+    Batch labels must have one entry per sample. The sparse input is densified;
+    the returned array is dense and shaped ``(samples, features)``.
 
     Returns
     -------
@@ -76,7 +98,7 @@ def combat(
         delta_hat = []
 
         # first estimate for the multiplicative batch effect
-        for i, batch_index in enumerate(batch_info):
+        for batch_index in batch_info:
             delta_hat.append(s_data.iloc[:, batch_index].var(axis=1))
 
         # empirically fix the prior hyperparameters
@@ -142,8 +164,7 @@ def _it_sol(
     b: float,
     conv: float = 0.0001,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """\
-    Iteratively compute the conditional posterior means for gamma and delta.
+    """Iteratively compute the conditional posterior means for gamma and delta.
 
     gamma is an estimator for the additive batch effect, deltat is an estimator
     for the multiplicative batch effect. We use an EB framework to estimate these
@@ -189,7 +210,10 @@ def _it_sol(
         sum2 = sum2.sum(axis=1)
         d_new = (0.5 * sum2 + b) / (n / 2.0 + a - 1.0)
 
-        change = max((abs(g_new - g_old) / g_old).max(), (abs(d_new - d_old) / d_old).max())
+        change = max(
+            (abs(g_new - g_old) / np.maximum(abs(g_old), np.finfo(float).eps)).max(),
+            (abs(d_new - d_old) / np.maximum(abs(d_old), np.finfo(float).eps)).max(),
+        )
         g_old = g_new  # .copy()
         d_old = d_new  # .copy()
         count = count + 1
@@ -211,8 +235,7 @@ def _bprior(delta_hat: np.ndarray):
 def _standardize_data(
     model: pd.DataFrame, data: pd.DataFrame, batch_key: str
 ) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:
-    """\
-    Standardizes the data per gene.
+    """Standardize data per feature.
 
     The aim here is to make mean and variance be comparable across batches.
 
@@ -274,8 +297,7 @@ def _standardize_data(
 
 # noinspection PyUnusedLocal
 def _design_matrix(model: pd.DataFrame, batch_key: str, batch_levels: ty.Collection[str]) -> pd.DataFrame:
-    """\
-    Computes a simple design matrix.
+    """Compute the batch design matrix.
 
     Parameters
     ----------
@@ -283,6 +305,8 @@ def _design_matrix(model: pd.DataFrame, batch_key: str, batch_levels: ty.Collect
         Contains the batch annotation
     batch_key
         Name of the batch column
+    batch_levels
+        Ordered batch levels used to construct the design matrix.
 
     Returns
     -------

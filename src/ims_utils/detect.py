@@ -14,14 +14,24 @@ def noop_logger(msg: str) -> None:
 
 
 def get_best_snr(data: list[tuple[int, float, int]]) -> tuple[int, float, int]:
-    """Calculate the best SNR using the Knee method.
+    """Choose an SNR candidate at the knee of index-versus-peak-count data.
 
-    Expects data as tuples of:
+    Each tuple is ``(candidate_index, snr, peak_count)``. The first field is the
+    candidate's x coordinate used for knee detection, the second is the SNR
+    selected for return, and the third is the score (peak count). The input is
+    expected in candidate order. If no knee is found, the tuple with the highest
+    peak count is returned.
 
-        (snr, something, score)
+    Parameters
+    ----------
+    data : list[tuple[int, float, int]]
+        Non-empty candidate tuples, each with at least three fields.
 
-    The knee is found using snr as x and score as y. If no knee can be found,
-    the function falls back to the row with the highest score.
+    Returns
+    -------
+    tuple[int, float, int]
+        The original candidate tuple nearest the detected knee, or the maximum-
+        peak-count candidate when a knee cannot be determined.
     """
     from ims_utils._vendored.kneed import KneeLocator
 

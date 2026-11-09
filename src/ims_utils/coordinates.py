@@ -22,7 +22,8 @@ def get_scan_direction(x_coords: np.ndarray, y_coords: np.ndarray, tolerance: fl
     tuple[str, int, int]
         Fast axis ("x" or "y"), x direction and y direction (1 increasing,
         -1 decreasing, 0 constant). Direction is the sign of the most common
-        non-zero step along the axis, so line returns do not dominate.
+        non-zero step along the axis, so line returns do not dominate. Ties
+        choose the x axis and increasing direction, respectively.
     """
 
     def _direction(values: np.ndarray) -> int:
@@ -90,7 +91,20 @@ def get_spacing(
 
 
 def get_spacing_consecutive(x_coords: np.ndarray, y_coords: np.ndarray, decimals: int = 1) -> tuple[float, float]:
-    """Estimate spacing from consecutive-step statistics (robust alternative)."""
+    """Estimate x/y spacing from the mode of consecutive motor-position steps.
+
+    Parameters
+    ----------
+    x_coords, y_coords : np.ndarray
+        Motor positions in acquisition order, in the same distance units.
+    decimals : int
+        Decimal places used to round each estimated spacing.
+
+    Returns
+    -------
+    tuple[float, float]
+        Estimated x and y pitches in the input units; an axis with no movement returns 0.
+    """
 
     def _spacing(values: np.ndarray) -> float:
         steps = np.abs(np.diff(values))
@@ -99,8 +113,11 @@ def get_spacing_consecutive(x_coords: np.ndarray, y_coords: np.ndarray, decimals
             return 0.0
         # histogram mode of steps is the pitch; take median of steps near the mode
         counts, edges = np.histogram(steps, bins="auto")
-        mode_center = 0.5 * (edges[np.argmax(counts)] + edges[np.argmax(counts) + 1])
+        mode_index = int(np.argmax(counts))
+        mode_center = 0.5 * (edges[mode_index] + edges[mode_index + 1])
         near_mode = steps[np.abs(steps - mode_center) < 0.25 * mode_center]
+        if near_mode.size == 0:
+            near_mode = steps[(steps >= edges[mode_index]) & (steps <= edges[mode_index + 1])]
         return float(np.round(np.median(near_mode), decimals))
 
     return _spacing(x_coords), _spacing(y_coords)

@@ -3,6 +3,16 @@
 from ims_utils.coordinates import get_scan_direction, get_spacing, get_spacing_consecutive
 
 
+def test_consecutive_spacing_sparse_histogram_has_a_finite_estimate() -> None:
+    assert get_spacing_consecutive([0.0, 1.0, 101.0], [0.0, 0.0, 0.0]) == (1.0, 0.0)
+    assert get_spacing_consecutive([], []) == (0.0, 0.0)
+
+
+def test_scan_direction_ties_and_constant_axes() -> None:
+    assert get_scan_direction([0.0, 1.0, 0.0], [0.0, 1.0, 0.0]) == ("x", 1, 1)
+    assert get_scan_direction([0.0, 0.0], [0.0, 0.0]) == ("x", 0, 0)
+
+
 def test_get_scan_direction():
     """Test get_scan_direction function."""
     x_coords = [0, 1, 2, 3, 4]

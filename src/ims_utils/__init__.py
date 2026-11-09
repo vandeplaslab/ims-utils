@@ -3,7 +3,7 @@
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("spec_utils")
+    __version__ = version("ims-utils")
 except PackageNotFoundError:
     __version__ = "uninstalled"
 

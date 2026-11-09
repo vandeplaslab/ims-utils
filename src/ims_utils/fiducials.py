@@ -1,5 +1,7 @@
 """File containing utility functions for fiducials."""
 
+from __future__ import annotations
+
 import typing as ty
 
 import numpy as np
@@ -63,7 +65,19 @@ def simplify_contour(contours: list[np.ndarray], d: float) -> list[np.ndarray]:
 
 
 def find_contours(image: np.ndarray) -> list[np.ndarray]:
-    """Find contours in image."""
+    """Find OpenCV contours in a two-dimensional image.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Image array, or an object with a ``compute`` method returning one. Values
+        are normalized to an 8-bit binary image before contour detection.
+
+    Returns
+    -------
+    list[np.ndarray]
+        Contours in OpenCV's ``(N, 1, 2)`` coordinate format.
+    """
     import cv2
 
     if hasattr(image, "compute"):
@@ -79,7 +93,18 @@ def find_contours(image: np.ndarray) -> list[np.ndarray]:
 
 
 def contour_formatter(contours: list[np.ndarray]) -> list[str]:
-    """Format contours."""
+    """Build labels for contours sorted from most to fewest points.
+
+    Parameters
+    ----------
+    contours : list[np.ndarray]
+        Contours to label.
+
+    Returns
+    -------
+    list[str]
+        Human-readable contour labels in descending point-count order.
+    """
     from natsort import index_natsorted, order_by_index
 
     # create options
@@ -91,10 +116,34 @@ def contour_formatter(contours: list[np.ndarray]) -> list[str]:
 
 
 def contour_to_points(contour: np.ndarray) -> np.ndarray:
-    """Convert contour to points."""
+    """Remove singleton dimensions from an OpenCV contour.
+
+    Parameters
+    ----------
+    contour : np.ndarray
+        Contour, typically shaped ``(N, 1, 2)``.
+
+    Returns
+    -------
+    np.ndarray
+        Point coordinates with singleton dimensions removed.
+    """
     return np.squeeze(contour)
 
 
 def filter_contours(contours: list[np.ndarray], n_min: int = 2) -> list[np.ndarray]:
-    """Filter contours."""
+    """Keep contours containing at least ``n_min`` points.
+
+    Parameters
+    ----------
+    contours : list[np.ndarray]
+        Contours to filter.
+    n_min : int
+        Minimum number of points to retain a contour.
+
+    Returns
+    -------
+    list[np.ndarray]
+        A new list containing qualifying contours; contour arrays are not copied.
+    """
     return [c for c in contours if len(c) >= n_min]

@@ -103,6 +103,8 @@ def local_estimate_noise(
     n = mz.size
     if y.size != n:
         raise ValueError("mz and intens must have the same length.")
+    if n == 0 and len(peaks):
+        raise ValueError("Cannot locate peaks in an empty m/z axis.")
 
     # Resolve peak indices
     if peaks_kind == "index":
@@ -113,15 +115,15 @@ def local_estimate_noise(
         pmz = np.asarray(peaks, dtype=float)
         # nearest neighbor indices via searchsorted
         idx = np.clip(np.searchsorted(mz, pmz), 0, n - 1)
-        # choose closer neighbor if we're on the right side
-        right = idx < n - 1
-        choose_left = right & (np.abs(pmz[right] - mz[idx[right]]) > np.abs(pmz[right] - mz[idx[right] - 1]))
-        idx[right][choose_left] -= 1
+        # Compare both neighboring bins and update the original index array.
+        left_idx = np.maximum(idx - 1, 0)
+        choose_left = np.abs(pmz - mz[left_idx]) < np.abs(pmz - mz[idx])
+        idx[choose_left] = left_idx[choose_left]
     else:
         raise ValueError("peaks_kind must be 'index' or 'mz'.")
 
     # Helpers to turn ppm/Da into absolute Da windows at a given mz
-    def _halfwidth_da(m0: float, ppm: float, da: float) -> float:
+    def _halfwidth_da(m0: float, ppm: float | None, da: float | None) -> float:
         w_ppm = m0 * ppm * 1e-6 if ppm is not None else 0.0
         w_da = da if da is not None else 0.0
         return max(w_ppm, w_da, 0.0)

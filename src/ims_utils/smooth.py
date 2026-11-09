@@ -23,6 +23,10 @@ def gaussian(y, sigma=1):
     -------
     y : np.array
         smoothed signal
+
+    Notes
+    -----
+    The input is not modified; the result has the same shape as ``y``.
     """
     return gaussian_filter(y, sigma=sigma, order=0)
 
@@ -41,6 +45,11 @@ def smooth_spectra(ys, sigma=1):
     -------
     ys : np.array
         smoothed array of signals
+
+    Notes
+    -----
+    Dense input is smoothed in place and returned. Sparse input is converted to a
+    dense array before smoothing and returning.
     """
     if issparse(ys):
         ys = np.array(ys.todense())

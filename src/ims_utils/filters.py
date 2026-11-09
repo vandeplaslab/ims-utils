@@ -78,12 +78,27 @@ class MedianIntensityFilter(FilterBase):
 
 @register("mean_below_mean")
 class MeanBelowMeanFilter(FilterBase):
-    """Filter signal below the mean below the mean."""
+    """Set intensities below the mean of below-mean values to zero."""
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Filter."""
+        """Zero low intensities and return the m/z and intensity arrays.
+
+        Parameters
+        ----------
+        mz_array : np.ndarray
+            M/z axis, returned unchanged.
+        intensity_array : np.ndarray
+            Intensities. Values below the calculated threshold are set to zero
+            in place.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            The original m/z array and the modified intensity array.
+        """
         mean = intensity_array.mean()
-        mean_below_mean = (intensity_array < mean).mean()
+        below_mean = intensity_array[intensity_array < mean]
+        mean_below_mean = below_mean.mean() if below_mean.size else mean
         mask = intensity_array < mean_below_mean
         intensity_array[mask] = 0.0
         return mz_array, intensity_array
@@ -140,7 +155,7 @@ class GaussianSmoothFilter(FilterBase):
 
 @register("mov_avg", 20)
 class MovingAverageFilter(FilterBase):
-    """Gaussian smoothing."""
+    """Smooth intensities with a uniform moving average in sample bins."""
 
     def __init__(self, size=20):
         self.size = size
@@ -229,7 +244,19 @@ class LinearResampling(FilterBase):
 
 
 class PpmResampling(FilterBase):
-    """Parts-per-million resampling."""
+    """Interpolate a spectrum onto a fixed ppm-spaced m/z grid.
+
+    Parameters
+    ----------
+    ppm : float
+        Target spacing in parts per million; must be positive.
+    mz_start, mz_end : float
+        M/z bounds, with ``mz_start < mz_end``. The start is included; the last
+        grid point is at or below the end.
+
+    The grid is generated during initialization and reused for every spectrum.
+    Interpolation clamps to endpoint intensities outside the source range.
+    """
 
     def __init__(self, ppm: float, mz_start: float, mz_end: float):
         from ims_utils.spectrum import get_ppm_axis
@@ -237,7 +264,7 @@ class PpmResampling(FilterBase):
         if ppm <= 0:
             raise ValueError("Please specify value of ppm that is larger than 0.")
         if mz_start == mz_end or mz_start > mz_end:
-            raise ValueError("Please specify `mz_start` and `mz_end` that are not equal and where `mz_start > mz_end`")
+            raise ValueError("Please specify `mz_start < mz_end`.")
 
         self.ppm = ppm
         self.mz_start = float(mz_start)
@@ -245,12 +272,37 @@ class PpmResampling(FilterBase):
         self.mz_new = get_ppm_axis(self.mz_start, self.mz_end, self.ppm)
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Filter."""
+        """Interpolate intensities onto the configured ppm grid.
+
+        Parameters
+        ----------
+        mz_array : np.ndarray
+            Ascending source m/z axis.
+        intensity_array : np.ndarray
+            Source intensities aligned with ``mz_array``.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            Configured m/z grid and interpolated intensities. The input arrays
+            are not modified.
+        """
         return self.mz_new, np.interp(self.mz_new, mz_array, intensity_array)
 
 
 class MzResampling(FilterBase):
-    """Resample spectrum to specified m/z values."""
+    """Interpolate spectra onto an explicit target m/z axis.
+
+    Parameters
+    ----------
+    mz : np.ndarray
+        Target m/z coordinates.
+    original_scale : bool
+        Rescale interpolated intensities to preserve the source maximum when
+        the interpolated maximum is nonzero.
+    original_dtype : bool
+        Cast output intensities back to the source intensity dtype.
+    """
 
     def __init__(self, mz: np.ndarray, original_scale: bool = False, original_dtype: bool = False):
         self.mz = mz
@@ -260,16 +312,15 @@ class MzResampling(FilterBase):
         self.original_dtype = original_dtype
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Filter."""
-        # crop array so that it fits the mass range - only if the mass range is actually too large
-        if self.mz_start < mz_array[0] or self.mz_end > mz_array[-1]:
-            start_idx, end_idx = find_nearest_index(mz_array, [self.mz_start, self.mz_end])
-            mz_array = mz_array[start_idx:end_idx]
-            intensity_array = intensity_array[start_idx:end_idx]
+        """Interpolate on the target grid, using endpoint values outside the source range.
+
+        Input arrays must be non-empty, one-dimensional and aligned, with m/z
+        ascending. Optional maximum scaling leaves an all-zero result unchanged.
+        """
         y_max = intensity_array.max()
         dtype = intensity_array.dtype
         intensity_array = np.interp(self.mz, mz_array, intensity_array)
-        if self.original_scale:
+        if self.original_scale and intensity_array.max() != 0:
             intensity_array = intensity_array / intensity_array.max() * y_max
         if self.original_dtype:
             intensity_array = retype(intensity_array, dtype)
@@ -334,7 +385,7 @@ class BaselineModifiedALS(FilterBase):
 @register("poly3", 3)
 @register("poly2", 2)
 class BaselinePolynomial(FilterBase):
-    """Remove baseline using asymmetric least squares."""
+    """Subtract an iteratively fitted polynomial baseline."""
 
     def __init__(self, order: int):
         self.order = order
@@ -365,22 +416,18 @@ class IndexRecalibrate(FilterBase):
         self.shift = shift
 
     def filter(self, mz_array: np.ndarray, intensity_array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Filter."""
-        from msalign.utilities import shift
-
-        _mz_array = shift(mz_array, self.shift, np.nan)
-        indices = np.where(np.isnan(_mz_array))[0]
-        index_max = indices.max()
-        # fill needs to happen at the front
-        if index_max + 2 < len(_mz_array):
-            spacing = _mz_array[index_max + 2] - _mz_array[index_max + 1]
-            fill = _mz_array[index_max + 1] - np.arange(len(indices)) * spacing
-        else:
-            index_min = np.min(indices)
-            spacing = _mz_array[index_min - 1] - _mz_array[index_min - 2]
-            fill = _mz_array[index_min - 1] - np.arange(len(indices)) * spacing
-        _mz_array[indices] = fill[::-1]
-        return _mz_array, intensity_array
+        """Shift the axis by sample bins and extrapolate missing edge coordinates."""
+        if self.shift == 0:
+            return mz_array.copy(), intensity_array
+        if mz_array.size < 2:
+            raise ValueError("At least two m/z values are required for nonzero index recalibration.")
+        positions = np.arange(mz_array.size) - self.shift
+        shifted = np.interp(positions, np.arange(mz_array.size), mz_array)
+        before = positions < 0
+        after = positions >= mz_array.size
+        shifted[before] = mz_array[0] + positions[before] * (mz_array[1] - mz_array[0])
+        shifted[after] = mz_array[-1] + (positions[after] - mz_array.size + 1) * (mz_array[-1] - mz_array[-2])
+        return shifted.astype(mz_array.dtype), intensity_array
 
 
 class PpmRecalibrate(FilterBase):

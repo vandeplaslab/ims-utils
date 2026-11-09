@@ -16,11 +16,18 @@ FORMULA_TO_REF = {
 
 
 def calculate_kendrick_mass_defect(mzs: np.ndarray, ref: str | float) -> tuple[np.ndarray, np.ndarray]:
-    """Calculate KM and KMD for specified formula."""
-    if ref not in FORMULA_TO_REF:
-        raise ValueError(f"Unknown formula: {ref}")
+    """Return Kendrick mass and truncated-nominal-minus-exact defect.
+
+    ``ref`` is a formula in ``FORMULA_TO_REF`` or a finite positive exact mass.
+    Both nominal reference mass and nominal Kendrick mass use truncation,
+    retaining the library's existing convention. Input m/z values are unchanged.
+    """
     if isinstance(ref, str):
+        if ref not in FORMULA_TO_REF:
+            raise ValueError(f"Unknown formula: {ref}")
         ref = FORMULA_TO_REF[ref]
+    if not np.isfinite(ref) or ref <= 0:
+        raise ValueError("Reference mass must be finite and positive.")
     _part, nominal = np.modf(ref)
 
     # calculate kendrick mass
@@ -41,7 +48,14 @@ def calculate_mass_defect(mzs: np.ndarray) -> np.ndarray:
 def filter_by_rules(
     df: pd.DataFrame, filter_regions: list[tuple[float, float, float, float]], select: bool = False
 ) -> pd.DataFrame:
-    """Filter dataframe based on specified rules."""
+    """Exclude rectangular regions, or retain their union when ``select=True``.
+
+    Each region is (minimum m/z, maximum m/z, maximum KMD, minimum KMD),
+    inclusive at all edges. Empty rules retain all rows, or none when selecting.
+    The input dataframe and its index are preserved.
+    """
+    if not filter_regions:
+        return df.iloc[:0] if select else df.copy()
     mask = np.any(
         [
             (df.mzs >= region[0]) & (df.mzs <= region[1]) & (df.kmd <= region[2]) & (df.kmd >= region[3])

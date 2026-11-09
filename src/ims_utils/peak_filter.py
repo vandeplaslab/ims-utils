@@ -15,7 +15,23 @@ GroupResult = list[tuple[list[int], list[float]]]
 
 
 class PeakFilter:
-    """Class for removing peaks based on some conditions."""
+    """Select peaks by m/z, matrix, Kendrick mass, mass defect, or isotope grouping.
+
+    Filter methods return indices to keep, not indices to remove. The
+    :attr:`indices` property intersects the keep sets from every filter that has
+    been run; :attr:`removed_indices` returns the complement. Results are cached
+    until :meth:`reset_filters` is called. The supplied m/z and intensity arrays
+    are retained as inputs and are not changed by selecting peaks.
+
+    Parameters
+    ----------
+    mzs : np.ndarray, optional
+        One-dimensional m/z values, normally sorted ascending.
+    intensities : np.ndarray, optional
+        Intensities aligned with ``mzs``.
+    polarity : Polarity, optional
+        Ion polarity used when selecting matrix peak lists.
+    """
 
     polarity: Polarity
     mzs: np.ndarray
@@ -43,17 +59,39 @@ class PeakFilter:
             self.polarity = polarity
 
     def reset_filters(self) -> None:
-        """Reset all filters."""
+        """Clear cached keep-index sets and isotope groups.
+
+        Subsequent filter calls start from the full input peak list.
+        """
         self._groups = None
         self._indices_by_mz = None
         self._indices_by_mz_merge = None
+        self._indices_by_matrix = None
         self._indices_by_kendrick_mass = None
         self._indices_by_mass_defect = None
+        self._groups_by_mz = None
+        self._groups_by_mz_merge = None
 
     def filter_by_mz(  # type: ignore[override]
         self, mz_tol: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> npt.NDArray:
-        """Identify groups of centroids."""
+        """Keep the most intense peak in each group at the requested m/z spacing.
+
+        Parameters
+        ----------
+        mz_tol : float
+            Absolute m/z tolerance in Da.
+        mz_ppm : float
+            Relative tolerance in ppm; when nonzero it replaces ``mz_tol``.
+        max_in_group : int
+            Maximum number of members in a group.
+
+        Returns
+        -------
+        npt.NDArray
+            Original indices of selected peaks. The indices are cached and
+            combined with keep indices from other filters.
+        """
         from ims_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
@@ -77,7 +115,11 @@ class PeakFilter:
     def filter_by_mz_merge(
         self, mz_tol: float = 5e-3, mz_ppm: float = 0, max_in_group: int = 6, **_kwargs: ty.Any
     ) -> npt.NDArray:
-        """Filter by m/z values."""
+        """Keep the most intense member of groups sharing an m/z value.
+
+        The grouping uses zero target distance and the supplied absolute Da or
+        ppm tolerance. Returns and caches original input indices to keep.
+        """
         from ims_utils.utilities import find_groups_within_bounds
 
         # Validate inputs
@@ -86,7 +128,9 @@ class PeakFilter:
         if not any([mz_ppm, mz_tol]):
             raise ValueError("Either `mz_ppm` or `mz_tol` must be specified")
         with MeasureTimer() as timer:
-            groups = find_groups_within_bounds(self.mzs, tolerance=mz_tol, ppm=mz_ppm, keep_singletons=True, distance=0)
+            groups = find_groups_within_bounds(
+                self.mzs, tolerance=mz_tol, ppm=mz_ppm, keep_singletons=True, distance=0, max_in_group=max_in_group
+            )
             self._indices_by_mz_merge = filter_groups(groups, self.intensities)
             self._groups_by_mz_merge = groups
             n = len(self.mzs) - len(self._indices_by_mz_merge)
@@ -104,7 +148,11 @@ class PeakFilter:
         mz_ppm: float = 0,
         **_kwargs: ty.Any,
     ) -> npt.NDArray:
-        """Identify groups of centroids."""
+        """Remove peaks matching a reference matrix peak list.
+
+        Returns and caches original input indices to keep. ``polarity="auto"``
+        uses the polarity supplied to this object.
+        """
         from koyo.utilities import find_nearest_index
 
         from ims_utils.assets import find_matrix
@@ -149,7 +197,11 @@ class PeakFilter:
     def filter_by_kendrick_mass(
         self, ref: str | float, filters: list[tuple[float, float, float, float]], **_kwargs: ty.Any
     ) -> npt.NDArray:
-        """Filter by Kendrick mass defect."""
+        """Exclude peaks falling inside the supplied Kendrick mass defect regions.
+
+        Each region is ``(min_mz, max_mz, max_kmd, min_kmd)``. Returns and
+        caches original input indices that remain after excluding those regions.
+        """
         from ims_utils.kendrick import calculate_kendrick_mass_defect, filter_by_rules
 
         with MeasureTimer() as timer:
@@ -165,7 +217,10 @@ class PeakFilter:
         return self._indices_by_kendrick_mass  # type: ignore[return-value]
 
     def filter_by_mass_defect(self, min_defect: float = 0.0, max_defect: float = 1.0, **_kwargs: ty.Any) -> npt.NDArray:
-        """Filter by mass defect."""
+        """Remove peaks whose fractional m/z lies in the inclusive defect range.
+
+        Returns and caches original input indices outside the requested range.
+        """
         with MeasureTimer() as timer:
             mass_defect, _nominal = np.modf(self.mzs)
             # mask = np.logical_and(min_defect <= mass_defect, mass_defect <= max_defect)
@@ -181,14 +236,14 @@ class PeakFilter:
 
     @property
     def removed_mzs(self) -> npt.NDArray:
-        """Return m/z values."""
+        """Return m/z values corresponding to the current removed indices."""
         if self.indices is None:
             raise ValueError("No indices to filter")
         return self.mzs[self.removed_indices]  # type: ignore[no-any-return]
 
     @property
     def remaining_mzs(self) -> npt.NDArray:
-        """Return m/z values."""
+        """Return m/z values corresponding to the current kept indices."""
         if self.indices is None:
             raise ValueError("No indices to filter")
         return self.mzs[self.indices]  # type: ignore[no-any-return]
@@ -208,7 +263,7 @@ class PeakFilter:
 
     @property
     def indices(self) -> npt.NDArray:
-        """Return indices of centroids to keep."""
+        """Return original indices kept by the intersection of active filters."""
         if not any(
             [
                 self._indices_by_mz is not None,
@@ -236,13 +291,13 @@ class PeakFilter:
 
     @property
     def removed_indices(self) -> npt.NDArray:
-        """Indices of centroids to remove."""
+        """Return original indices excluded by the active filters."""
         if self.indices is None:
             raise ValueError("No indices to filter")
         return self.removed_indices_against(self.indices)
 
     def removed_indices_against(self, indices: npt.NDArray) -> npt.NDArray:
-        """Indices of centroids to remove."""
+        """Return original indices absent from the supplied keep-index array."""
         if indices is None:
             raise ValueError("No indices to filter")
         return np.setdiff1d(np.arange(len(self.mzs)), indices)
@@ -301,17 +356,25 @@ class PeakFilter:
         return self.mzs[indices], self.intensities[indices]
 
 
-def get_weights_for_indicies(weights: npt.NDArray, indices: list) -> npt.NDArray:
-    """Return list of colocalizations values.
+def get_weights_for_indices(weights: npt.NDArray, indices: list[int]) -> npt.NDArray:
+    """Return pairwise weights along a sequence of peak indices.
 
-    Return value for each ion but make sure to take value for pairs with last index.
+    The first value is the first peak's self-weight; later values compare each
+    peak to its predecessor. Empty indices produce an empty float array.
     """
     res = np.zeros(len(indices))
+    if len(indices) == 0:
+        return res
     last_index = indices[0]
     for i, index in enumerate(indices):
         res[i] = weights[last_index, index]
         last_index = index
     return np.asarray(res)
+
+
+def get_weights_for_indicies(weights: npt.NDArray, indices: list[int]) -> npt.NDArray:
+    """Compatibility spelling for ``get_weights_for_indices``."""
+    return get_weights_for_indices(weights, indices)
 
 
 def filter_groups(groups: list[tuple[list[int], list[float]]], intensities: npt.NDArray) -> npt.NDArray:

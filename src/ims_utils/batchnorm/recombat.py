@@ -34,7 +34,24 @@ if not is_installed("patsy"):
 
 
 def recombat(array: np.ndarray, batches: np.ndarray, key: str = "batch", **kwargs):
-    """Calculate recombat."""
+    """Run ReComBat on a samples-by-features array.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        Data matrix shaped ``(samples, features)``.
+    batches : np.ndarray
+        One batch label per sample.
+    key : str
+        Batch annotation name.
+    **kwargs
+        Options forwarded to :class:`ReComBat`.
+
+    Returns
+    -------
+    np.ndarray
+        Corrected dense array with the input shape and sample order.
+    """
     combat = ReComBat(**kwargs)
     return combat.fit_transform(pd.DataFrame(array), pd.Series(batches, name=key)).values
 
@@ -69,8 +86,8 @@ class ReComBat:
         Perform empirical Bayes optimization.
         The default is True.
     reference_batch : str, optional
-        Give a reference batch which is not adjusted.
-        The default is None.
+        Reserved option, stored but currently not used by the correction.
+        All batches are adjusted. The default is None.
     """
 
     alpha_ = None
@@ -115,8 +132,7 @@ class ReComBat:
         self.is_fitted = False
 
     def fit(self, data, batches):
-        """
-        Fit method.
+        """Fit model coefficients and empirical Bayes batch parameters.
 
         Parameters
         ----------
@@ -129,6 +145,11 @@ class ReComBat:
         Returns
         -------
         None
+
+        Notes
+        -----
+        Data is samples by features. Fitting rejects missing values, mismatched
+        sample counts, a single batch, or batches with fewer than two samples.
         """
         if isinstance(data, np.ndarray):
             data = pd.DataFrame(data)
@@ -175,7 +196,7 @@ class ReComBat:
     def transform(self, data: pd.DataFrame, batches):
         """Transform method.
 
-        Adjusts a dataframe. Please make sure that the number of batches,
+        Adjust a dataframe. Please make sure that the number of batches,
         features and design matrix features match.
 
         Parameters

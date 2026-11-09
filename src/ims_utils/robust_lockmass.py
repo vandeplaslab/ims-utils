@@ -80,8 +80,7 @@ def _nb_find_all_candidates(
             win_sum += nb.float64(y[k])
         win_thresh = threshold
         secondary = (win_sum / n) * centroid_frac
-        if secondary > win_thresh:
-            win_thresh = secondary
+        win_thresh = max(win_thresh, secondary)
 
         count = 0
         for i in range(1, n - 1):
@@ -575,6 +574,11 @@ class RobustLockmassEstimator:
             ``np.polyfit``), or ``None`` if RANSAC fitting failed.
         inlier_mask : np.ndarray (bool)
             Boolean mask indicating which candidates are RANSAC inliers.
+
+        Notes
+        -----
+        Positive ppm values indicate observed peaks above their reference m/z. Coefficients
+        are in descending polynomial order and describe ppm offset as a function of reference m/z.
         """
         ref_mz_flat, obs_ppm_flat, peak_starts, peak_counts = self._find_candidates(mz_y)
         poly_coeffs, inlier_mask = self._fit_polynomial(ref_mz_flat, obs_ppm_flat, peak_starts, peak_counts)
@@ -588,7 +592,7 @@ class RobustLockmassEstimator:
         mz_y : np.ndarray
             Intensity values of the spectrum.
         fast : bool
-            If ``True`` (default), evaluate the polynomial at the geometric mean
+            If ``True`` (default), evaluate the polynomial at the arithmetic mean
             of the reference peaks and apply a single scalar shift via
             ``fast_roll``. Fastest option; equivalent to the original lockmass
             approach but with a robust polynomial-fitted shift.

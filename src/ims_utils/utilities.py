@@ -9,13 +9,9 @@ from ims_utils.spectrum import ppm_to_delta_mass
 
 def find_highest(indices: list[int], intensities: np.ndarray) -> int:
     """Find the highest intensity within a group."""
-    indices = np.asarray(indices)  # type: ignore[assignment]
-    if len(indices) == 1:
-        index = indices[0]
-    else:
-        ys = intensities[indices]
-        index = indices[np.argmax(ys)]
-    return index
+    if len(indices) == 0:
+        raise ValueError("At least one index is required.")
+    return int(indices[np.argmax(intensities[indices])])
 
 
 def find_groups_within_bounds(
@@ -27,22 +23,30 @@ def find_groups_within_bounds(
     max_in_group: int = 6,
 ) -> list[tuple[list[int], list[float]]]:
     """
-    Find groups of values within specified bounds. For each group, subsequent matches are
-    checked against the last entry in the group.
+    Find disjoint groups separated by a target distance in sorted m/z values.
+
+    Each match is compared to the last group member. Earlier groups have priority
+    when candidates could belong to multiple groups.
 
     Parameters
     ----------
-        arr (np.ndarray): The sorted input array.
-        distance (float): Default distance
-        tolerance (float): Tolerance around the distance.
-        keep_singletons (bool): Whether to include singletons in the output.
-        max_in_group (int): Maximum number of elements in a group.
+    arr : np.ndarray
+        Ascending one-dimensional m/z array.
+    distance : float
+        Target difference between adjacent group members in m/z units.
+    tolerance : float
+        Absolute tolerance around the target distance.
+    ppm : float, optional
+        If nonzero, replace absolute tolerance with ppm of the group's first m/z.
+    keep_singletons : bool
+        Include groups containing only one peak.
+    max_in_group : int
+        Maximum number of peaks per group.
 
     Returns
     -------
-        List[Tuple[List[int], List[float]]]: A list of groups, where each group contains:
-            - A list of indices of the matching data points.
-            - A list of corresponding values from the array.
+    list[tuple[list[int], list[float]]]
+        Original indices and corresponding m/z values for each group.
     """
     if ppm:
         tolerance = 0
@@ -71,6 +75,8 @@ def find_groups_within_bounds(
         # Check subsequent elements for matches relative to the last group member
         last_index = i
         for j in range(i + 1, n):
+            if j in visited:
+                continue
             diff = arr[j] - arr[last_index]
             if min_distance <= diff <= max_distance and len(group_indices) < max_in_group:
                 group_indices.append(j)
@@ -97,25 +103,36 @@ def find_groups_within_bounds_weighted(
     max_in_group: int = 6,
 ) -> list[tuple[list[int], list[float]]]:
     """
-    Find groups of values using distance bounds and weights. For each group, subsequent matches
-    are checked against the last entry in the group.
+    Find disjoint distance-based groups gated by pairwise weights.
+
+    Distance is always measured from the last member. Low-weight candidates are
+    skipped because later candidates within the mass window may still qualify.
 
     Parameters
     ----------
-        arr (np.ndarray): The sorted input array.
-        weights (np.ndarray): A 2D array of weights between all pairs of values.
-        distance (float): Default distance.
-        tolerance (float): Tolerance around the distance.
-        weight_threshold (float): Minimum weight required to link points in the same group.
-        keep_singletons (bool): Whether to include singletons in the output.
-        compare_to_last (bool): Whether to compare subsequent matches to the last entry in the group.
-        max_in_group (int): Maximum number of elements in a group.
+    arr : np.ndarray
+        Ascending one-dimensional m/z array.
+    weights : np.ndarray
+        Square pairwise weight matrix aligned with ``arr``.
+    distance : float
+        Target difference between adjacent members in m/z units.
+    tolerance : float
+        Absolute tolerance around the distance.
+    ppm : float, optional
+        If nonzero, replace absolute tolerance with ppm of the group's first m/z.
+    weight_threshold : float
+        Minimum accepted weight, inclusive.
+    keep_singletons : bool
+        Include groups containing only one peak.
+    compare_to_last : bool
+        Compare weights to the last member if True, otherwise to the first.
+    max_in_group : int
+        Maximum number of peaks per group.
 
     Returns
     -------
-        List[Tuple[List[int], List[float]]]: A list of groups, where each group contains:
-            - A list of indices of the matching data points.
-            - A list of corresponding values from the array.
+    list[tuple[list[int], list[float]]]
+        Original indices and corresponding m/z values for each group.
     """
     if ppm:
         tolerance = 0
@@ -145,6 +162,8 @@ def find_groups_within_bounds_weighted(
         last_index = i
         reference_index = i  # Initially compare to the first entry
         for j in range(i + 1, n):
+            if j in visited:
+                continue
             diff = arr[j] - arr[last_index]
             if (
                 min_distance <= diff <= max_distance
@@ -157,7 +176,7 @@ def find_groups_within_bounds_weighted(
                 last_index = j  # Update the reference point for further matches
                 if compare_to_last:
                     reference_index = j  # Update the reference point to the last group member
-            elif diff > max_distance or weights[reference_index, j] < weight_threshold:
+            elif diff > max_distance:
                 break  # Exit early since array is sorted
 
         if len(group_indices) > min_in_group:  # Only include groups with more than one element

@@ -24,7 +24,15 @@ LOCKMASS_THRESHOLD: float = 500
 
 
 class LockmassEstimator:
-    """Lockmass estimator class."""
+    """Base class for estimating lockmass peak offsets on a profile spectrum.
+
+    Parameters
+    ----------
+    mz_x : np.ndarray
+        One-dimensional, ordered m/z axis shared by spectra passed to this estimator.
+    peaks : np.ndarray
+        Reference lockmass m/z values. They are sorted during initialization.
+    """
 
     def __init__(self, mz_x: np.ndarray, peaks: np.ndarray):
         """Initialize lockmass estimator.
@@ -41,7 +49,7 @@ class LockmassEstimator:
         self.n_peaks = len(self.peaks)
 
     def __call__(self, mz_y: np.ndarray, **kwargs: ty.Any) -> np.ndarray:
-        """Estimate lockmass shifts for the given spectrum.
+        """Estimate lockmass shifts for one spectrum.
 
         Parameters
         ----------
@@ -51,11 +59,16 @@ class LockmassEstimator:
         **kwargs: ty.Any
             Additional keyword arguments for specific estimators. See individual estimator implementations
             for details.
+
+        Returns
+        -------
+        np.ndarray
+            Estimated index offsets, one per sorted reference peak.
         """
         return self.estimate(mz_y, **kwargs)
 
     def estimate(self, mz_y: np.ndarray, **kwargs: ty.Any) -> np.ndarray:
-        """Estimate lockmass shifts for the given spectrum.
+        """Estimate lockmass shifts for one spectrum.
 
         Parameters
         ----------
@@ -65,11 +78,16 @@ class LockmassEstimator:
         **kwargs: ty.Any
             Additional keyword arguments for specific estimators. See individual estimator implementations
             for details.
+
+        Returns
+        -------
+        np.ndarray
+            Estimated index offsets, one per sorted reference peak.
         """
         raise NotImplementedError("Must implement method")
 
     @staticmethod
-    def apply(mz_y: np.ndarray, shift: int | float) -> np.ndarray:
+    def apply(mz_y: np.ndarray, shift: float) -> np.ndarray:
         """Apply lockmass shift to the given spectrum.
 
         Parameters
@@ -79,6 +97,11 @@ class LockmassEstimator:
             of m/z values as used during initialization.
         shift: int | float
             Shift value to apply. Float values are rounded to the nearest integer.
+
+        Returns
+        -------
+        np.ndarray
+            A new intensity array shifted along its index axis; exposed values are filled with zero.
         """
         return fast_roll(mz_y, shift)
 
@@ -94,6 +117,11 @@ class LockmassEstimator:
             Whether to use weighted distance for peak selection.
         silent: bool
             Whether to suppress progress output from the reader iterator.
+
+        Returns
+        -------
+        np.ndarray
+            Float32 array shaped ``(reader.n_pixels, n_reference_peaks)`` containing index offsets.
         """
         if not hasattr(reader, "n_pixels"):
             raise ValueError("reader must have n_pixels attribute")
@@ -107,7 +135,17 @@ class LockmassEstimator:
 
 
 class MaximumIntensityLockmassEstimator(LockmassEstimator):
-    """Maximum intensity lockmass estimator."""
+    """Estimate each reference offset from the maximum in a fixed m/z window.
+
+    Parameters
+    ----------
+    mz_x : np.ndarray
+        Ordered profile m/z axis.
+    peaks : np.ndarray
+        Reference m/z values.
+    window : float
+        Half-width of each search window in the same m/z units as ``mz_x``.
+    """
 
     def __init__(self, mz_x: np.ndarray, peaks: np.ndarray, window: float = 0.1):
         """Initialize lockmass estimator.
@@ -153,7 +191,19 @@ class MaximumIntensityLockmassEstimator(LockmassEstimator):
 
 
 class WeightedIntensityLockmassEstimator(LockmassEstimator):
-    """Weighted intensity lockmass estimator."""
+    """Estimate offsets from an intensity-weighted parabolic centroid per window.
+
+    Parameters
+    ----------
+    mz_x : np.ndarray
+        Ordered profile m/z axis.
+    peaks : np.ndarray
+        Reference m/z values.
+    window : float
+        Half-width of each search window in the same m/z units as ``mz_x``.
+    centroid_frac : float
+        Fraction of the mean window intensity used as a secondary centroid threshold.
+    """
 
     def __init__(self, mz_x: np.ndarray, peaks: np.ndarray, window: float = 0.1, centroid_frac: float = 0.25):
         """Initialize lockmass estimator.
@@ -299,6 +349,7 @@ def _nb_parabolic_centroid_window(
     n = len(y)
     best_cx = np.nan
     best_cy = -1.0
+    found = False
     centre = global_offset + n / 2.0
 
     for i in range(1, n - 1):
@@ -331,9 +382,10 @@ def _nb_parabolic_centroid_window(
         if np.isnan(cx) or np.isnan(cy):
             continue
         # prefer the centroid closest to the window centre
-        if best_cx is np.nan or abs(cx - centre) < abs(best_cx - centre):
+        if not found or abs(cx - centre) < abs(best_cx - centre):
             best_cx = cx
             best_cy = cy
+            found = True
 
     return best_cx, best_cy
 
@@ -363,8 +415,7 @@ def _nb_estimate_lockmass_shifts(
     for j in range(n_peaks):
         s, e = starts[j], stops[j]
         for k in range(s, e):
-            if mz_y[k] > max_intensity:
-                max_intensity = mz_y[k]
+            max_intensity = max(max_intensity, mz_y[k])
     if max_intensity < threshold:
         return out  # caller emits warning at Python level
 
@@ -375,8 +426,7 @@ def _nb_estimate_lockmass_shifts(
         # Per-peak intensity gate
         peak_max = -1.0
         for k in range(s, e):
-            if mz_y[k] > peak_max:
-                peak_max = mz_y[k]
+            peak_max = max(peak_max, mz_y[k])
         if peak_max < individual_threshold:
             continue
 
@@ -390,7 +440,7 @@ def _nb_estimate_lockmass_shifts(
     return out
 
 
-def fast_roll(array: np.ndarray, num: int | float, fill_value: int | float = 0) -> np.ndarray:
+def fast_roll(array: np.ndarray, num: float, fill_value: float = 0) -> np.ndarray:
     """Shift 1d array to a new position with 0 padding to prevent wraparound.
 
     Function is actually quicker than np.roll.

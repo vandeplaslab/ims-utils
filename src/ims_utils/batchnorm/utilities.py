@@ -1,22 +1,45 @@
-import typing as ty
+from __future__ import annotations
+
 import warnings
 
 import numpy as np
 import pandas as pd
 from mpire import WorkerPool
 
-if ty.TYPE_CHECKING:
-    import pandas as pd
-
 
 def create_batches(centroids: dict[str, np.ndarray], key: str = "batches") -> pd.Series:
-    """Create batches."""
+    """Build one batch label per row from named centroid arrays.
+
+    Parameters
+    ----------
+    centroids : dict[str, np.ndarray]
+        Mapping from batch label to its samples-by-features array. Mapping order
+        determines output label order.
+    key : str
+        Name assigned to the returned pandas series.
+
+    Returns
+    -------
+    pd.Series
+        Concatenated batch labels, with one label for each input row.
+    """
     batches = np.concatenate([np.full(len(v), k) for (k, v) in centroids.items()])
     return pd.Series(batches, name=key)
 
 
 def combine_arrays(centroids: dict[str, np.ndarray]) -> np.ndarray:
-    """Combine arrays."""
+    """Concatenate named samples-by-features arrays in mapping order.
+
+    Parameters
+    ----------
+    centroids : dict[str, np.ndarray]
+        Arrays to concatenate along the sample axis.
+
+    Returns
+    -------
+    np.ndarray
+        Combined array. Feature counts must match.
+    """
     return np.concatenate(list(centroids.values()))
 
 
@@ -81,18 +104,18 @@ def new_delta_star_squared_parametric(theta_bar_i, Z_i, gamma_star_new_i, n_i, l
 
 
 def parametric_update(
-    gamma_star_i,
-    delta_star_squared_i,
-    n_i,
-    tau_bar_squared_i,
-    gamma_hat_i,
-    gamma_bar_i,
-    theta_bar_i,
-    lambda_bar_i,
-    Z_i,
-    conv_criterion=1e-4,
-    max_iter=1000,
-):
+    gamma_star_i: np.ndarray,
+    delta_star_squared_i: np.ndarray,
+    n_i: int,
+    tau_bar_squared_i: float,
+    gamma_hat_i: np.ndarray,
+    gamma_bar_i: float,
+    theta_bar_i: float,
+    lambda_bar_i: float,
+    Z_i: np.ndarray,
+    conv_criterion: float = 1e-4,
+    max_iter: int = 1000,
+) -> tuple[np.ndarray, np.ndarray]:
     """Perform the optimization for one batch at a time."""
     gamma_star_new_i = gamma_star_i.copy()
     delta_star_squared_new_i = delta_star_squared_i.copy()
@@ -107,8 +130,11 @@ def parametric_update(
 
         convergence = np.max(
             [
-                np.max(np.abs(gamma_star_new_i - gamma_star_i) / gamma_star_i),
-                np.max(np.abs(delta_star_squared_new_i - delta_star_squared_i) / delta_star_squared_i),
+                np.max(np.abs(gamma_star_new_i - gamma_star_i) / np.maximum(np.abs(gamma_star_i), np.finfo(float).eps)),
+                np.max(
+                    np.abs(delta_star_squared_new_i - delta_star_squared_i)
+                    / np.maximum(np.abs(delta_star_squared_i), np.finfo(float).eps)
+                ),
             ]
         )
         gamma_star_i = gamma_star_new_i

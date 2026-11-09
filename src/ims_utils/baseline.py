@@ -1,14 +1,15 @@
 """Baseline."""
 
+from __future__ import annotations
+
 import math
-import typing as ty
 
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 
 
 # TODO: should try to speed this up as the for-loop makes this very computationally expensive
-def curve(data, window: int, **_kwargs):
+def curve(data: np.ndarray, window: int, **_kwargs: object) -> np.ndarray:
     """Based on massign method: https://pubs.acs.org/doi/abs/10.1021/ac300056a.
 
     We initialise an array which has the same length as the input array, subsequently smooth the spectrum  and then
@@ -34,16 +35,16 @@ def curve(data, window: int, **_kwargs):
     return _curve(data, window)
 
 
-def _curve(data, window: int):
+def _curve(data: np.ndarray, window: int) -> np.ndarray:
     length = data.shape[0]
-    mins = np.zeros(length, dtype=np.int32)
+    mins = np.zeros(length, dtype=np.float64)
     for i in range(length):
         mins[i] = np.amin(data[int(max([0, i - window])) : int(min([i + window, length]))])
     background = gaussian_filter(mins, window * 2)
     return data - background
 
 
-def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e-3, **_kwargs):
+def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e-3, **_kwargs: object) -> np.ndarray:
     """Computes the baseline of a given data.
 
     Iteratively performs a polynomial fitting in the data to detect its
@@ -54,7 +55,7 @@ def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e
     ----------
     y : ndarray
         Data to detect the baseline.
-    deg : int (default: 3)
+    deg : int (default: 4)
         Degree of the polynomial that will estimate the data baseline. A low
         degree may fail to detect all the baseline present, while a high
         degree may make the data too oscillatory, especially at the edges.
@@ -94,12 +95,12 @@ def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e
     base = y.copy()
 
     vander = np.vander(x, order)
-    vander_pinv = scipy.linalg.pinv2(vander)
+    vander_pinv = scipy.linalg.pinv(vander)
 
     for _ in range(max_iter):
         coeffs_new = np.dot(vander_pinv, y)
 
-        if scipy.linalg.norm(coeffs_new - coeffs) / scipy.linalg.norm(coeffs) < tol:
+        if scipy.linalg.norm(coeffs_new - coeffs) <= tol * max(scipy.linalg.norm(coeffs), np.finfo(float).eps):
             break
 
         coeffs = coeffs_new
@@ -109,7 +110,7 @@ def polynomial(y: np.ndarray, deg: int = 4, max_iter: int = 100, tol: float = 1e
     return base
 
 
-def als(y, lam, p, niter=10):
+def als(y: np.ndarray, lam: float, p: float, niter: int = 10) -> np.ndarray:
     """Asymmetric Least Squares smoothing.
 
     There are two parameters p for asymmetry and lambda for smoothness.
@@ -120,19 +121,19 @@ def als(y, lam, p, niter=10):
 
     # taken from: https://stackoverflow.com/questions/29156532/python-baseline-correction-library/29185844
     n = len(y)
-    diag = sparse.diags([1, -2, 1], [0, -1, -2], shape=(n, n - 2))
+    diag = sparse.diags([1, -2, 1], [0, -1, -2], shape=(n, n - 2), dtype=float)
     w = np.ones(n)
     z = np.zeros_like(w)
     while niter > 0:
         W = sparse.spdiags(w, 0, n, n)
         Z = W + lam * diag.dot(diag.transpose())
-        z = spsolve(Z, w * y)
-        w = p * (y > z) + (1 - p) * (y < z)
+        z = spsolve(Z.tocsc(), w * y)
+        w = np.where(y > z, p, 1 - p)
         niter -= 1
     return z
 
 
-def arpls(y: np.ndarray, lam: float = 100, ratio: float = 1e-6, niter: int = 10):
+def arpls(y: np.ndarray, lam: float = 100, ratio: float = 1e-6, niter: int = 10) -> np.ndarray:
     """Modified ALS.
 
     See: https://stackoverflow.com/a/67509948
@@ -140,6 +141,7 @@ def arpls(y: np.ndarray, lam: float = 100, ratio: float = 1e-6, niter: int = 10)
     from numpy.linalg import norm
     from scipy import sparse
     from scipy.sparse.linalg import spsolve
+    from scipy.special import expit
 
     L = len(y)
 
@@ -155,14 +157,16 @@ def arpls(y: np.ndarray, lam: float = 100, ratio: float = 1e-6, niter: int = 10)
     count = 0
 
     while crit > ratio:
-        z = spsolve(W + H, W * y)
+        z = spsolve((W + H).tocsc(), W * y)
         d = y - z
         dn = d[d < 0]
-
+        if dn.size == 0:
+            break
         m = np.mean(dn)
         s = np.std(dn)
-
-        w_new = 1 / (1 + np.exp(2 * (d - (2 * s - m)) / s))
+        if s == 0:
+            break
+        w_new = expit(-2 * (d - (2 * s - m)) / s)
 
         crit = norm(w_new - w) / norm(w)
 
@@ -199,7 +203,7 @@ def median(data, median_window: int = 5, **_kwargs):
 
 def tophat(data, tophat_window=100, **_kwargs):
     """Top-hat filter."""
-    from scipy.ndimage.morphology import white_tophat
+    from scipy.ndimage import white_tophat
 
     return white_tophat(data, tophat_window)
 
@@ -207,13 +211,13 @@ def tophat(data, tophat_window=100, **_kwargs):
 def baseline_1d(
     y,
     baseline_method: str = "linear",
-    threshold: ty.Optional[float] = None,
-    poly_order: ty.Optional[int] = 4,
-    max_iter: ty.Optional[int] = 100,
-    tol: ty.Optional[float] = 1e-3,
-    median_window: ty.Optional[int] = 5,
-    curved_window: ty.Optional[int] = None,
-    tophat_window: ty.Optional[int] = 100,
+    threshold: float | None = None,
+    poly_order: int | None = 4,
+    max_iter: int | None = 100,
+    tol: float | None = 1e-3,
+    median_window: int | None = 5,
+    curved_window: int | None = None,
+    tophat_window: int | None = 100,
     **_kwargs,
 ):
     """Subtract baseline from the y-axis intensity array.

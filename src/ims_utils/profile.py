@@ -107,10 +107,8 @@ def _add_peaks_numba(
         start = np.searchsorted(mz_grid, left)
         end = np.searchsorted(mz_grid, right)
 
-        if start < 0:
-            start = 0
-        if end > mz_grid.size:
-            end = mz_grid.size
+        start = max(start, 0)
+        end = min(end, mz_grid.size)
 
         for j in range(start, end):
             dx = mz_grid[j] - mu
@@ -125,7 +123,7 @@ def centroid_to_profile(
     # Resolution controls (pick one): resolving_power OR fwhm OR fwhm_func
     resolving_power: float | np.ndarray | None = None,
     fwhm: float | np.ndarray | None = None,
-    fwhm_func: ty.Callable | None = None,
+    fwhm_func: ty.Callable[[float], float] | None = None,
     # Grid controls
     mz_grid: np.ndarray | None = None,
     mz_min: float | None = None,
@@ -136,18 +134,19 @@ def centroid_to_profile(
     window: float = 5.0,
     intensity_mode: ty.Literal["height", "area"] = "height",  # "height" or "area"
     dtype: np.dtype = np.float64,
-):
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Convert centroid peaks (mz, intensity) to a summed Gaussian profile.
 
     Parameters
     ----------
     x : (N,) array
-        Centroid m/z positions.1
+        Centroid m/z positions.
     y : (N,) array
         Centroid intensities. Interpreted per `intensity_mode`.
     sort : bool, default False
-        Sort input peaks by m/z if True (otherwise must be pre-sorted).
+        Sort input peaks and per-peak widths by m/z if True. Returned sigma
+        values follow this sorted order.
     resolving_power : float or (N,) array, optional
         If set: FWHM_i = mz_i / R_i. (Specify exactly one of these three:)
     fwhm : float or (N,) array, optional
@@ -163,7 +162,7 @@ def centroid_to_profile(
     points_per_fwhm : int, default 8
         If auto-grid, target ~this many points across median FWHM.
     window : float, default 5.0
-        Truncate each Gaussian at ±window * sigma.
+        Truncate each Gaussian at +/-window * sigma.
     intensity_mode : {"height","area"}, default "height"
         "height": centroid intensities are peak heights (amplitudes).
         "area": centroid intensities are areas; code converts to Gaussian height.
@@ -196,12 +195,6 @@ def centroid_to_profile(
             raise ValueError("Empty input and no grid specified.")
         return np.asarray(mz_grid, dtype=float), np.zeros_like(mz_grid, dtype=dtype), np.array([], dtype=float)
 
-    # Sort centroids by m/z (helps windowing/searchsorted)
-    if sort:
-        order = np.argsort(x)
-        x = x[order]
-        y = y[order]
-
     # Per-peak sigma from resolution model
     sigma = _compute_sigma(
         x,
@@ -209,6 +202,13 @@ def centroid_to_profile(
         fwhm=fwhm,
         fwhm_func=fwhm_func,
     )
+    if not np.all(np.isfinite(sigma) & (sigma > 0)):
+        raise ValueError("Peak widths must be finite and positive.")
+    if window <= 0 or points_per_fwhm <= 0 or (bin_width is not None and bin_width <= 0):
+        raise ValueError("window, points_per_fwhm and bin_width must be positive.")
+    if sort:
+        order = np.argsort(x)
+        x, y, sigma = x[order], y[order], sigma[order]
 
     # Grid
     if mz_grid is None:
@@ -237,7 +237,12 @@ def centroid_to_profile(
 def centroid_to_profile_ppm(
     x: np.ndarray, y: np.ndarray, mz_min: float, mz_max: float, ppm: float = 1.0, mz: float = 200
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Convert centroid data to profile data.
+    """Reprofile centroids with Gaussian peaks and fixed-Da grid spacing.
+
+    Peak widths vary with each centroid m/z according to the requested ppm
+    width. The output grid uses the Da spacing implied by ``ppm`` at ``mz``;
+    it is therefore a fixed-spacing grid, not a constant-ppm grid. This helper
+    requires the optional, undeclared ``ms_peak_picker`` package.
 
     Parameters
     ----------
@@ -252,8 +257,16 @@ def centroid_to_profile_ppm(
     ppm : float
         Spacing in ppm for the profile spectrum.
     mz : float
-        M/z value at which the ppm spacing is calculated.
+        M/z value at which the ppm spacing is converted to fixed Da spacing.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Generated m/z grid and profile intensity array. The output intensity
+        maximum is rescaled to the input maximum. Inputs are not modified.
     """
+    if not HAS_MPP:
+        raise ImportError("centroid_to_profile_ppm requires the optional ms_peak_picker package.")
     x = _ensure_1d(x, "mz").astype(float)
     y = _ensure_1d(y, "intensity").astype(float)
     if x.size != y.size:

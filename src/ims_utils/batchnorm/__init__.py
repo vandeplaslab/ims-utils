@@ -9,15 +9,19 @@ except ImportError:
     HAS_COMBAT = False
 
     def ComBat(*args, **kwargs):
+        """Report that optional ComBat dependencies are unavailable."""
         return print("ComBat not available - please install pandas or ims-utils[batch]")
 
     def combat(*args, **kwargs):
+        """Report that optional ComBat dependencies are unavailable."""
         return print("ComBat not available - please install pandas or ims-utils[batch]")
 
     def combine_arrays(*args, **kwargs):
+        """Report that optional ComBat dependencies are unavailable."""
         return print("ComBat not available - please install pandas or ims-utils[batch]")
 
     def create_batches(*args, **kwargs):
+        """Report that optional ComBat dependencies are unavailable."""
         return print("ComBat not available - please install pandas or ims-utils[batch]")
 
 
@@ -29,4 +33,5 @@ except ImportError:
     HAS_RECOMBAT = False
 
     def ReComBat(*args, **kwargs):
-        return print("ReComBat not available - please install patsy, scikit-learn or  or ims-utils[batch]")
+        """Report that optional ReComBat dependencies are unavailable."""
+        return print("ReComBat not available - please install ims-utils[batch]")

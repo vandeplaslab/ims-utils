@@ -22,24 +22,38 @@ def _get_colors(n: int) -> list[str]:
 
 
 def write_html(fig: go.Figure, filename: PathLike) -> None:
-    """Write HTML to file."""
+    """Write a Plotly figure to an HTML file, creating parent directories.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objects.Figure
+        Figure to serialize. Plotly JavaScript is loaded from a CDN.
+    filename : PathLike
+        Destination file path.
+    """
     filename = Path(filename)
     filename.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(filename), include_plotlyjs="cdn")
 
 
 def show_html(filename: PathLike) -> None:
-    """Show HTML in browser."""
+    """Open an existing HTML file in the default web browser.
+
+    Parameters
+    ----------
+    filename : PathLike
+        Local HTML file to open.
+    """
     import webbrowser
 
-    filename = Path(filename)
+    filename = Path(filename).resolve()
     webbrowser.open(filename.as_uri())
 
 
 def make_plot(
     x: np.ndarray, y: np.ndarray, name: str, x_label: str = "", y_label: str = "", title: str = ""
 ) -> go.Figure:
-    """Export Plotly line plot as HTML document."""
+    """Create and return a Plotly line figure."""
     import plotly.graph_objects as go
 
     # Create a figure
@@ -63,7 +77,26 @@ def make_plot(
 def add_scatter(
     fig: go.Figure, x: np.ndarray, y: np.ndarray, name: str = "scatter", color: str = "blue", visible: bool = True
 ) -> go.Figure:
-    """Add scatter plot."""
+    """Add a marker trace to a Plotly figure.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objects.Figure
+        Figure updated in place.
+    x, y : np.ndarray
+        Coordinates of the markers.
+    name : str
+        Trace name shown in the legend.
+    color : str
+        Marker color.
+    visible : bool
+        If false, keep the trace in the legend but initially hide it.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The same figure, with the scatter trace appended.
+    """
     import plotly.graph_objects as go
 
     fig.add_trace(
@@ -77,7 +110,26 @@ def add_scatter(
 def add_line(
     fig: go.Figure, x: np.ndarray, y: np.ndarray, name: str = "line", color: str = "blue", visible: bool = True
 ) -> go.Figure:
-    """Add line plot."""
+    """Add a line trace to a Plotly figure.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objects.Figure
+        Figure updated in place.
+    x, y : np.ndarray
+        Coordinates of the line.
+    name : str
+        Trace name shown in the legend.
+    color : str
+        Line color.
+    visible : bool
+        If false, keep the trace in the legend but initially hide it.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The same figure, with the line trace appended.
+    """
     import plotly.graph_objects as go
 
     fig.add_trace(
@@ -87,7 +139,7 @@ def add_line(
 
 
 def make_spectrum(mz_x: np.ndarray, mz_y: np.ndarray, name: str) -> go.Figure:
-    """Export Plotly mass spectrum as HTML document."""
+    """Create and return a Plotly figure for one mass spectrum."""
     return make_plot(mz_x, mz_y, name, x_label="m/z", y_label="Intensity", title="Mass Spectrum")
 
 
@@ -102,7 +154,7 @@ def make_peaks_spectrum(
     height: int = 350,
     titles: list[str] | None = None,
 ) -> go.Figure:
-    """Export Plotly mass spectrum as HTML document."""
+    """Create and return a multi-panel figure comparing spectra near target peaks."""
     import plotly.graph_objects as go
     from koyo.utilities import get_array_window
     from plotly.subplots import make_subplots
@@ -135,7 +187,7 @@ def make_peaks_spectrum(
         row, col = (i // n_cols + 1, i % n_cols + 1)
         for j, (name, (mz_x, mz_y)) in enumerate(spectra.items()):
             mz_x_window, mz_y_window = get_array_window(mz_x, peak - window, peak + window, mz_y)
-            if normalize:
+            if normalize and mz_y_window.size and mz_y_window.max() != 0:
                 mz_y_window = mz_y_window / mz_y_window.max()
             color = colors[j]
             fig.add_trace(
@@ -175,7 +227,7 @@ def make_overlay_spectrum(
     mz_min: float | None = None,
     mz_max: float | None = None,
 ) -> go.Figure:
-    """Export Plotly mass spectrum as HTML document."""
+    """Create and return an overlay figure for multiple spectra."""
     import plotly.graph_objects as go
 
     # Create a figure
@@ -185,10 +237,12 @@ def make_overlay_spectrum(
     y_max = 0
     ys_ = {}
     for name, (mz_x, mz_y) in spectra.items():
-        if normalize:
+        if normalize and mz_y.max() != 0:
             mz_y = mz_y / mz_y.max()
         if mz_min is not None or mz_max is not None:
-            x, y = get_array_window(mz_x, mz_min or mz_x.min(), mz_max or mz_x.max(), mz_y)
+            x, y = get_array_window(
+                mz_x, mz_x.min() if mz_min is None else mz_min, mz_x.max() if mz_max is None else mz_max, mz_y
+            )
             fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name))
         else:
             fig.add_trace(go.Scatter(x=mz_x, y=mz_y, mode="lines", name=name))
@@ -198,16 +252,16 @@ def make_overlay_spectrum(
             ys_[name] = mz_y[indices]
 
     if px is not None:
-        if as_vline or py is not None:
+        if as_vline:
             for x in px:
                 fig.add_vline(x=x, line_width=1, line_dash="dash", line_color="black")
         else:
             if py is None:
-                for name, py in ys_.items():
+                for name, peak_intensity in ys_.items():
                     fig.add_trace(
                         go.Scatter(
                             x=px,
-                            y=py,
+                            y=peak_intensity,
                             mode="markers",
                             name=f"{name} (peaks)",
                             marker={"color": "black", "size": 10, "symbol": "diamond-tall", "opacity": 0.5},
@@ -224,8 +278,8 @@ def make_overlay_spectrum(
                     )
                 )
     # Update x/y min/max
-    x_min = mz_min or min(mz_x.min() for mz_x, _ in spectra.values())
-    x_max = mz_max or max(mz_x.max() for mz_x, _ in spectra.values())
+    x_min = min(mz_x.min() for mz_x, _ in spectra.values()) if mz_min is None else mz_min
+    x_max = max(mz_x.max() for mz_x, _ in spectra.values()) if mz_max is None else mz_max
 
     # Update layout
     fig.update_layout(
@@ -250,7 +304,7 @@ def make_spectrum_with_scatter(
     marker_size: int = 5,
     marker_opacity: float = 0.75,
 ) -> go.Figure:
-    """Export Plotly mass spectrum as HTML document."""
+    """Create and return a spectrum figure with scatter markers."""
     import plotly.graph_objects as go
 
     # Create a figure
@@ -279,7 +333,7 @@ def make_spectrum_with_scatter(
         xaxis_title="m/z",
         yaxis_title="Intensity",
         template="simple_white",
-        width=1200,  #
+        width=1200,
         height=800,  # Adjust height here
         yaxis={"range": [0, y_max * 1.05]},
     )
@@ -289,17 +343,17 @@ def make_spectrum_with_scatter(
 def make_butterfly_spectrum(
     mz_x: np.ndarray, mz_y_top: np.ndarray, mz_y_bottom: np.ndarray, name_top: str, name_bottom: str
 ) -> go.Figure:
-    """Export Plotly mass spectrum as HTML document."""
+    """Create and return a butterfly comparison figure for two spectra."""
     import plotly.graph_objects as go
 
     # Create a figure
     fig = go.Figure()
 
     # Add the mass spectrum line
-    fig.add_trace(go.Scatter(x=mz_x, y=mz_y_top / mz_y_top.max(), mode="lines", name=name_top, line={"color": "blue"}))
-    fig.add_trace(
-        go.Scatter(x=mz_x, y=-mz_y_bottom / mz_y_bottom.max(), mode="lines", name=name_bottom, line={"color": "red"})
-    )
+    top = mz_y_top / mz_y_top.max() if mz_y_top.max() != 0 else mz_y_top.copy()
+    bottom = mz_y_bottom / mz_y_bottom.max() if mz_y_bottom.max() != 0 else mz_y_bottom.copy()
+    fig.add_trace(go.Scatter(x=mz_x, y=top, mode="lines", name=name_top, line={"color": "blue"}))
+    fig.add_trace(go.Scatter(x=mz_x, y=-bottom, mode="lines", name=name_bottom, line={"color": "red"}))
 
     # Update layout
     fig.update_layout(
@@ -316,11 +370,11 @@ def make_butterfly_spectrum(
 def make_difference_spectrum(
     mz_x: np.ndarray, mz_y_top: np.ndarray, mz_y_bottom: np.ndarray, name_top: str, name_bottom: str
 ) -> go.Figure:
-    """Export Plotly mass spectrum as HTML document."""
+    """Create and return a difference-spectrum figure."""
     import plotly.graph_objects as go
 
-    mz_y_top = mz_y_top / mz_y_top.max()
-    mz_y_bottom = mz_y_bottom / mz_y_bottom.max()
+    mz_y_top = mz_y_top / mz_y_top.max() if mz_y_top.max() != 0 else mz_y_top.copy()
+    mz_y_bottom = mz_y_bottom / mz_y_bottom.max() if mz_y_bottom.max() != 0 else mz_y_bottom.copy()
 
     # make difference plot and mask values above and below
     mz_y_diff = mz_y_top - mz_y_bottom

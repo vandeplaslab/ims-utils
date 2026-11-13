@@ -33,7 +33,7 @@ dependencies = [
     "numpy",
     "scipy",
     "numba",
-    "koyo>=0.3.5",
+    "koyo>=0.3.7",
     "msalign",
     "loguru",
     "tqdm",
